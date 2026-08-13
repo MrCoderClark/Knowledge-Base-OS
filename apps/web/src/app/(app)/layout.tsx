@@ -1,11 +1,16 @@
+import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
+import { auth } from "@/server/auth";
 
-export default function AppLayout({
+export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await auth();
+  if (!session?.user) redirect("/signin");
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />

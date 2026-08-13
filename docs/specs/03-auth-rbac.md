@@ -7,16 +7,23 @@ Multi-tenant model: **Organization → Team → Membership(role) → Permissions
 
 ## 1. Authentication (Auth.js)
 
-- **Adapter:** `@auth/drizzle-adapter` against the `users`/`accounts`/`sessions` tables.
-- **Providers (launch):** Email/OAuth — recommend Google + Microsoft Entra (enterprise
-  audience) plus optional credentials for dev. Final provider list is an open decision
-  in `PLAN.md`.
-- **Session:** database sessions; `session.user` carries `id`, `email`, `name`,
-  `avatarUrl`.
+**Credentials-only, admin-provisioned. No self-registration, no OAuth/social login.**
+
+- **Provider:** Auth.js `Credentials` (email + password). `authorize()` looks up the
+  user by email and verifies the bcrypt `password_hash`.
+- **Session:** **JWT** strategy (required when using the Credentials provider — Auth.js
+  cannot persist Credentials sessions in the DB). `session.user` carries `id`, `email`,
+  `name`, `image`. No `account`/`session`/`verificationToken` adapter tables.
+- **Account creation:** users are created **only by admins** (Phase 0: the `db:seed`
+  owner admin; Phase 1: the Users module, `member:invite`/`member:manage` gated). There
+  is no public sign-up route — `/signin` only authenticates existing accounts.
+- **Passwords:** bcrypt (cost 12) in `src/server/auth/password.ts`. Admin sets/reset
+  passwords; (Phase 1) optional invite-token or forced-reset-on-first-login flow.
 - **Org context:** a user may belong to multiple orgs. The active `org_id` is resolved
-  from the route/subdomain/selector and validated against the user's memberships on
-  every request. Never trust an `org_id` from the client without a membership check.
-- **Phase 3:** SSO/SAML + SCIM provisioning slot in at the provider layer.
+  from the route/selector and validated against the user's memberships on every request.
+  Never trust an `org_id` from the client without a membership check.
+- **Phase 3:** enterprise SSO/SAML + SCIM provisioning can be added later as an
+  additional provider without disturbing the credentials path.
 
 ## 2. Authorization model
 
@@ -84,12 +91,17 @@ Rules:
    the boundary.
 5. **Audit.** Every mutation writes an `activity_events` row.
 
-## 4. Invitations & membership lifecycle
+## 4. Account & membership lifecycle (admin-managed)
 
-- Invite by email → `memberships` row `status = invited` + tokened email link.
-- Accept → links/creates the `users` row, flips to `active`.
-- Suspend/remove → `status = suspended` / row delete; sessions re-validated against
-  membership on next request.
+- **Create:** an admin creates the `users` row (name, email) and either sets an initial
+  password or issues a one-time set-password link; a `memberships` row is created with
+  the chosen org role (default `status = active`).
+- **No self-service:** there is no public registration; users cannot create their own
+  accounts or change their own role.
+- **Suspend/remove:** admin sets `status = suspended` or deletes the membership; a
+  suspended/removed user fails authorization on the next request (JWT re-checked against
+  membership).
+- **Password reset:** admin-initiated reset (Phase 1); optional force-reset-on-first-login.
 
 ## 5. Permissions UI (design's "Permissions" page)
 
