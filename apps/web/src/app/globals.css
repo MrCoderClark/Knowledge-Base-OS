@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — source of truth is docs/DESIGN.md.
+ * Tailwind v4 generates utilities from these --color-* / --font-* names
+ * (e.g. bg-canvas, text-heading, border-border).
+ */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Surfaces & structure */
+  --color-canvas: #f8fafc; /* app background (Level 0) */
+  --color-surface: #ffffff; /* cards (Level 1) */
+  --color-border: #e2e8f0; /* structural divisions */
+  --color-border-strong: #cbd5e1; /* hover lift */
+  --color-nav-active: #f1f5f9; /* sidebar active bg */
+
+  /* Brand */
+  --color-slate: #0f172a; /* primary / nav / buttons */
+  --color-indigo: #6366f1; /* accent / active / focus / progress */
+  --color-indigo-soft: #eef2ff; /* 10% indigo surfaces */
+
+  /* Text */
+  --color-heading: #1e293b;
+  --color-body: #475569;
+  --color-muted: #94a3b8;
+
+  /* Status */
+  --color-success: #16a34a;
+  --color-danger: #ba1a1a;
+}
+
+/* Level-2 overlay shadow (dropdowns/modals) — the only shadow we use. */
+@theme {
+  --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.05);
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-body);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
