@@ -1,6 +1,11 @@
 import { Bell, HelpCircle, Search } from "lucide-react";
+import { UserMenu } from "./UserMenu";
 
-export function Topbar() {
+type Props = {
+  user: { name: string | null; email: string };
+};
+
+export function Topbar({ user }: Props) {
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-surface px-6">
       {/* Command-K search (visual for now; wired in the Search feature) */}
@@ -27,7 +32,9 @@ export function Topbar() {
         >
           <Bell className="size-5" />
         </button>
-        <div className="ml-1 size-9 rounded-full bg-gradient-to-br from-indigo to-slate" />
+        <div className="ml-1">
+          <UserMenu user={user} />
+        </div>
       </div>
     </header>
   );

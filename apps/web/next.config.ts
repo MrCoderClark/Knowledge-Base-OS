@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Native / server-only packages must not be bundled by Turbopack; load them
+  // via Node's require at runtime instead.
+  serverExternalPackages: ["@node-rs/argon2", "ioredis", "bcryptjs"],
 };
 
 export default nextConfig;

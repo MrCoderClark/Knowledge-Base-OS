@@ -1,33 +1,13 @@
 "use client";
 
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useActionState } from "react";
+import { loginAction } from "@/server/auth/actions";
+import type { LoginState } from "@/server/auth/auth-types";
+
+const initialState: LoginState = {};
 
 export default function SignInPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setPending(true);
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-    setPending(false);
-    if (res?.error) {
-      setError("Invalid email or password.");
-      return;
-    }
-    router.push("/");
-    router.refresh();
-  }
+  const [state, formAction, pending] = useActionState(loginAction, initialState);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
@@ -47,18 +27,17 @@ export default function SignInPage() {
           Use the credentials provided by your administrator.
         </p>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form action={formAction} className="space-y-4">
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-heading">
               Email
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               autoComplete="username"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               className="h-10 w-full rounded-lg border border-border bg-canvas px-4 text-body-md text-heading placeholder:text-muted focus:border-indigo focus:outline-none focus:ring-2 focus:ring-indigo/20"
             />
           </div>
@@ -68,16 +47,24 @@ export default function SignInPage() {
             </label>
             <input
               id="password"
+              name="password"
               type="password"
               autoComplete="current-password"
               required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               className="h-10 w-full rounded-lg border border-border bg-canvas px-4 text-body-md text-heading placeholder:text-muted focus:border-indigo focus:outline-none focus:ring-2 focus:ring-indigo/20"
             />
           </div>
 
-          {error && <p className="text-sm text-danger">{error}</p>}
+          <label className="flex items-center gap-2 text-sm text-body">
+            <input
+              name="rememberMe"
+              type="checkbox"
+              className="size-4 rounded border-border text-indigo focus:ring-indigo/20"
+            />
+            Remember me for 30 days
+          </label>
+
+          {state.error && <p className="text-sm text-danger">{state.error}</p>}
 
           <button
             type="submit"
