@@ -215,6 +215,10 @@ keep a CAPTCHA/step-up hook, rather than indefinite lockout. See §14 threat mod
 - **Persistent lock authority** lives in Postgres (`locked_until`) so it survives a Redis
   flush; Redis provides fast, distributed counters. Limits are cheap O(1) ops (no DoS via
   the limiter itself).
+- **Admin unlock:** the ratelimit module exposes a `clearLoginLimitsForAccount(email)`
+  helper (deletes the `rl_login_acct:*` keys); the Users-module unlock action calls it
+  **and** clears `locked_until`/`failed_login_attempts` in Postgres so the user can sign
+  in immediately (see the Users module in [`05-features.md`](./05-features.md)).
 
 ---
 

@@ -90,9 +90,17 @@ page supports filters (type/category) and pagination.
 ## Users
 - Org member directory: avatar, name, email, org role, teams, status, last active.
 - Invite by email; change role; suspend/remove. See [`03-auth-rbac.md`](./03-auth-rbac.md).
+- **Account status & lock management:** show each user's status — `active`,
+  `invited`, `suspended`, and **`locked`** (derived from `locked_until > now`). A locked
+  row shows a badge + when it auto-expires.
+- **Admin unlock action:** an admin can unlock a locked account immediately. Unlock
+  **must clear both stores**: reset `locked_until = null` + `failed_login_attempts = 0`
+  in Postgres **and** delete the user's Redis login limiter keys (`rl_login_acct:*` for
+  that account) — otherwise Redis keeps throttling. Log `ACCOUNT_UNLOCKED`.
 
 **Acceptance:** invite flow works end to end; role changes take effect immediately;
-only `admin`/`owner` can manage members.
+only `admin`/`owner` can manage members; locked accounts are visibly flagged and an
+admin unlock lets the user sign in right away (DB **and** Redis cleared).
 
 ---
 

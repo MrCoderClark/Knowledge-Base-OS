@@ -54,9 +54,12 @@ async function main() {
         normalizedEmail: admin.normalizedEmail ?? adminEmail,
         status: "active",
         passwordHash: admin.passwordHash ?? passwordHash,
+        // Reset lock state so re-seeding also unlocks the admin during dev.
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       })
       .where(eq(users.id, admin.id));
-    console.log("• admin user updated:", admin.email);
+    console.log("• admin user updated (lock reset):", admin.email);
   }
 
   const existing = await db
