@@ -2,8 +2,12 @@ import { eq } from "drizzle-orm";
 import { getCurrentSession } from "@/server/auth/session";
 import { db } from "@/server/db";
 import { memberships } from "@/server/db/schema";
+import { hasPermission, type Permission } from "./permissions";
 
 export type OrgRole = "owner" | "admin" | "editor" | "viewer";
+
+export { hasPermission };
+export type { Permission };
 
 export type Actor = {
   userId: string;
@@ -39,6 +43,15 @@ export function isAdmin(role: OrgRole): boolean {
 export async function requireAdmin(): Promise<Actor> {
   const actor = await getActor();
   if (!actor || !isAdmin(actor.role)) {
+    throw new Error("Forbidden");
+  }
+  return actor;
+}
+
+/** Throws unless the current user holds `permission`. Returns the actor. */
+export async function requirePermission(permission: Permission): Promise<Actor> {
+  const actor = await getActor();
+  if (!actor || !hasPermission(actor.role, permission)) {
     throw new Error("Forbidden");
   }
   return actor;

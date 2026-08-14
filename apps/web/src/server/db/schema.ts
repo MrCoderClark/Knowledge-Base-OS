@@ -1,4 +1,5 @@
 import {
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -110,6 +111,35 @@ export const teamMembers = pgTable(
     role: teamRole("role").notNull().default("member"),
   },
   (t) => [unique().on(t.teamId, t.userId)],
+);
+
+/* ------------------------------------------------------------------ */
+/* Knowledge base content (see docs/specs/02-data-model.md)           */
+/* ------------------------------------------------------------------ */
+
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    parentId: uuid("parent_id"),
+    color: text("color"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    unique().on(t.orgId, t.slug),
+    foreignKey({
+      columns: [t.parentId],
+      foreignColumns: [t.id],
+      name: "categories_parent_id_fk",
+    }).onDelete("set null"),
+  ],
 );
 
 /* ------------------------------------------------------------------ */
