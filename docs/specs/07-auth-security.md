@@ -256,13 +256,16 @@ requests need protection. Layers:
 3. All state changes are non-GET; GETs are side-effect-free.
 4. Next Server Actions' built-in same-origin checks are kept, not relied on alone.
 
-**Security headers** (middleware/`next.config`): `Strict-Transport-Security` (prod),
-`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
-`Permissions-Policy` (deny camera/mic/geo), `X-Frame-Options: DENY` +
-`frame-ancestors 'none'`, and a **CSP built from the actual app** (self scripts/styles,
-`img-src 'self' data:`, `connect-src 'self'`, no external CDNs/fonts since Inter is
-self-hosted via `next/font`). Any unavoidable `unsafe-inline` for styles is documented;
-scripts use nonces where feasible.
+**Security headers** — implemented in **`src/proxy.ts`** (Next 16's renamed
+middleware): `Strict-Transport-Security` (prod), `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (deny
+camera/mic/geo/topics), `X-Frame-Options: DENY` + `frame-ancestors 'none'`, and a
+**nonce-based CSP** (per-request nonce + `strict-dynamic` for scripts; `img-src 'self'
+blob: data:`; `font-src 'self'` — Inter self-hosted via `next/font`, no external CDNs).
+Documented exceptions: **`style-src 'unsafe-inline'`** (React sets inline `style`
+attributes, which nonces don't cover — scripts stay strictly nonce-gated); dev-only
+`'unsafe-eval'` + `ws:` for React/HMR. Nonce requires per-request rendering, so the root
+layout sets `export const dynamic = "force-dynamic"`.
 
 ---
 
