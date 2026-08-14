@@ -52,3 +52,39 @@ export async function sendInviteEmail(params: {
     ),
   });
 }
+
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  name?: string | null;
+  url: string;
+}): Promise<void> {
+  const greeting = params.name ? `Hi ${params.name},` : "Hi,";
+  await sendMail({
+    to: params.to,
+    subject: "Reset your KnowledgeOS password",
+    text: `${greeting}\n\nWe received a request to reset your password. Use the link below (expires in 30 minutes):\n${params.url}\n\nIf you didn't request this, you can ignore this email — your password won't change.`,
+    html: layout(
+      "Reset your password",
+      `<p style="margin:0 0 16px;font-size:14px;">${greeting} we received a request to reset your password.</p>
+       <p style="margin:0 0 20px;">${button(params.url, "Reset password")}</p>
+       <p style="margin:0;font-size:12px;color:#94a3b8;">This link expires in 30 minutes. If you didn't request it, ignore this email — your password won't change.</p>`,
+    ),
+  });
+}
+
+export async function sendPasswordChangedEmail(params: {
+  to: string;
+  name?: string | null;
+}): Promise<void> {
+  const greeting = params.name ? `Hi ${params.name},` : "Hi,";
+  await sendMail({
+    to: params.to,
+    subject: "Your KnowledgeOS password was changed",
+    text: `${greeting}\n\nYour password was just changed and all active sessions were signed out. If this wasn't you, contact your administrator immediately.`,
+    html: layout(
+      "Your password was changed",
+      `<p style="margin:0 0 12px;font-size:14px;">${greeting} your password was just changed and all active sessions were signed out.</p>
+       <p style="margin:0;font-size:13px;">If this wasn't you, contact your administrator immediately.</p>`,
+    ),
+  });
+}

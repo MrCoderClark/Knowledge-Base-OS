@@ -2,3 +2,5 @@
 export type LoginState = { error?: string };
 export type InviteState = { error?: string; success?: string };
 export type AcceptState = { error?: string };
+export type ForgotState = { sent?: boolean };
+export type ResetState = { error?: string };
