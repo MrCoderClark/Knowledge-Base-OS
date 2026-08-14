@@ -21,6 +21,10 @@ const schema = z.object({
   SMTP_PASSWORD: z.string().min(1),
   EMAIL_FROM: z.string().min(1),
 
+  // Local file storage root (resolved from the app cwd). Swap the storage
+  // module for object storage in production without touching callers.
+  STORAGE_DIR: z.string().default("./.storage"),
+
   SEED_ADMIN_EMAIL: z.string().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),
   SEED_ADMIN_NAME: z.string().optional(),

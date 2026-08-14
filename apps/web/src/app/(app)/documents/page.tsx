@@ -31,12 +31,20 @@ export default async function DocumentsPage() {
           </p>
         </div>
         {canCreate && (
-          <Link
-            href="/documents/new"
-            className="flex h-10 items-center rounded-lg bg-slate px-4 text-sm font-medium text-white hover:opacity-90"
-          >
-            New Document
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/documents/upload"
+              className="flex h-10 items-center rounded-lg border border-border bg-surface px-4 text-sm font-medium text-body hover:border-border-strong hover:text-slate"
+            >
+              Upload
+            </Link>
+            <Link
+              href="/documents/new"
+              className="flex h-10 items-center rounded-lg bg-slate px-4 text-sm font-medium text-white hover:opacity-90"
+            >
+              New Document
+            </Link>
+          </div>
         )}
       </header>
 

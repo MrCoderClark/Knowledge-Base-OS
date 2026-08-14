@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { categories, documentVersions, documents } from "@/server/db/schema";
+import { deleteFile } from "@/server/storage";
 import { slugify } from "./categories";
 
 export type DocStatus = "draft" | "published" | "archived";
@@ -78,6 +79,35 @@ export async function createDocument(params: {
   return row.id;
 }
 
+export async function createUploadedDocument(params: {
+  orgId: string;
+  title: string;
+  categoryId: string | null;
+  fileKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdBy: string;
+}): Promise<string> {
+  const slug = await uniqueSlug(params.orgId, params.title);
+  const [row] = await db
+    .insert(documents)
+    .values({
+      orgId: params.orgId,
+      title: params.title.trim(),
+      slug,
+      categoryId: params.categoryId,
+      docType: "uploaded",
+      fileKey: params.fileKey,
+      mimeType: params.mimeType,
+      sizeBytes: params.sizeBytes,
+      status: "published",
+      createdBy: params.createdBy,
+      updatedBy: params.createdBy,
+    })
+    .returning({ id: documents.id });
+  return row.id;
+}
+
 export async function updateDocument(params: {
   orgId: string;
   id: string;
@@ -131,7 +161,10 @@ export async function deleteDocument(params: {
   orgId: string;
   id: string;
 }): Promise<void> {
+  const doc = await getDocument(params.orgId, params.id);
+  if (!doc) return;
+  if (doc.fileKey) await deleteFile(doc.fileKey);
   await db
     .delete(documents)
-    .where(and(eq(documents.id, params.id), eq(documents.orgId, params.orgId)));
+    .where(and(eq(documents.id, doc.id), eq(documents.orgId, params.orgId)));
 }
