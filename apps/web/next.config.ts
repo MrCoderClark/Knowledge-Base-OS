@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     "bcryptjs",
     "rate-limiter-flexible",
     "nodemailer",
+    "sanitize-html",
   ],
 };
 

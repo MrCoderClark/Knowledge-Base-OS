@@ -1,4 +1,5 @@
 import {
+  bigint,
   foreignKey,
   index,
   integer,
@@ -140,6 +141,69 @@ export const categories = pgTable(
       name: "categories_parent_id_fk",
     }).onDelete("set null"),
   ],
+);
+
+export const docStatus = pgEnum("doc_status", [
+  "draft",
+  "published",
+  "archived",
+]);
+export const docType = pgEnum("doc_type", ["authored", "uploaded"]);
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    categoryId: uuid("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    docType: docType("doc_type").notNull().default("authored"),
+    // Authored content (Tiptap JSON for editing + rendered HTML for display).
+    body: jsonb("body"),
+    bodyHtml: text("body_html"),
+    // Uploaded content (populated in slice 2b).
+    fileKey: text("file_key"),
+    mimeType: text("mime_type"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
+    status: docStatus("status").notNull().default("draft"),
+    currentVersion: integer("current_version").notNull().default(1),
+    createdBy: text("created_by").references(() => users.id),
+    updatedBy: text("updated_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    unique().on(t.orgId, t.slug),
+    index("documents_org_created_idx").on(t.orgId, t.createdAt),
+  ],
+);
+
+export const documentVersions = pgTable(
+  "document_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    body: jsonb("body"),
+    bodyHtml: text("body_html"),
+    changeNote: text("change_note"),
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [unique().on(t.documentId, t.version)],
 );
 
 /* ------------------------------------------------------------------ */
