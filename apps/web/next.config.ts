@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "ioredis",
     "bcryptjs",
     "rate-limiter-flexible",
+    "nodemailer",
   ],
 };
 
