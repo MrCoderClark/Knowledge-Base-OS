@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { db } from "@/server/db";
 import { sessions, users } from "@/server/db/schema";
@@ -152,4 +152,98 @@ export async function destroyCurrentSession(): Promise<void> {
       .where(eq(sessions.tokenHash, hashToken(token)));
   }
   cookieStore.delete(COOKIE_NAME);
+}
+
+export type ActiveSession = {
+  id: string;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+  lastSeenAt: Date;
+};
+
+/** List a user's active (non-revoked, non-expired) sessions, newest activity first. */
+export async function listUserSessions(userId: string): Promise<ActiveSession[]> {
+  const now = new Date();
+  return db
+    .select({
+      id: sessions.id,
+      ip: sessions.ip,
+      userAgent: sessions.userAgent,
+      createdAt: sessions.createdAt,
+      lastSeenAt: sessions.lastSeenAt,
+    })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        isNull(sessions.revokedAt),
+        gt(sessions.expiresAt, now),
+      ),
+    )
+    .orderBy(desc(sessions.lastSeenAt));
+}
+
+/** Revoke a single session, scoped to its owner (prevents cross-user IDOR). */
+export async function revokeUserSession(
+  userId: string,
+  sessionId: string,
+): Promise<void> {
+  await db
+    .update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(sessions.id, sessionId),
+        eq(sessions.userId, userId),
+        isNull(sessions.revokedAt),
+      ),
+    );
+}
+
+/** Revoke all of a user's sessions except the one to keep. */
+export async function revokeOtherUserSessions(
+  userId: string,
+  keepSessionId: string,
+): Promise<void> {
+  const rows = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+  const now = new Date();
+  for (const r of rows) {
+    if (r.id !== keepSessionId) {
+      await db
+        .update(sessions)
+        .set({ revokedAt: now })
+        .where(eq(sessions.id, r.id));
+    }
+  }
+}
+
+/**
+ * Rotate the current session's token + refresh its authenticated timestamp
+ * (called after a password change / security-sensitive event).
+ */
+export async function rotateCurrentSession(): Promise<void> {
+  const cookieStore = await cookies();
+  const oldToken = cookieStore.get(COOKIE_NAME)?.value;
+  if (!oldToken) return;
+
+  const newToken = generateToken();
+  const now = new Date();
+  const [row] = await db
+    .update(sessions)
+    .set({ tokenHash: hashToken(newToken), lastAuthenticatedAt: now })
+    .where(eq(sessions.tokenHash, hashToken(oldToken)))
+    .returning({ expiresAt: sessions.expiresAt });
+  if (!row) return;
+
+  cookieStore.set(COOKIE_NAME, newToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: "lax",
+    path: "/",
+    expires: row.expiresAt,
+  });
 }

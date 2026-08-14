@@ -1,7 +1,8 @@
 "use client";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { LogOut } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { logoutAction } from "@/server/auth/actions";
 
 type Props = {
@@ -41,6 +42,18 @@ export function UserMenu({ user }: Props) {
             </div>
             <div className="truncate text-xs text-muted">{user.email}</div>
           </div>
+
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+
+          <DropdownMenu.Item
+            asChild
+            className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-body outline-none data-[highlighted]:bg-nav-active data-[highlighted]:text-slate"
+          >
+            <Link href="/account/security">
+              <ShieldCheck className="size-4" />
+              Account security
+            </Link>
+          </DropdownMenu.Item>
 
           <DropdownMenu.Separator className="my-1 h-px bg-border" />
 
