@@ -1,6 +1,6 @@
 # Spec 07 — Authentication & Session Security (Design)
 
-Status: **Design — awaiting sign-off** · Phase: 1a (auth track) · Owner: TBD
+Status: **Implemented** (steps 1–9; see [`docs/reviews/auth-security-review.md`](../reviews/auth-security-review.md)) · Phase: 1a (auth track) · Owner: TBD
 
 Authoritative design for the production-grade auth system requested in
 [`docs/AUTHENTICATION.md`](../AUTHENTICATION.md). This **supersedes the

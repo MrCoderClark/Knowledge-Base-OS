@@ -35,11 +35,13 @@ export async function requestPasswordReset(emailInput: string): Promise<void> {
     expiresAt: new Date(Date.now() + RESET_TTL_MS),
   });
 
-  await sendPasswordResetEmail({
+  // Fire-and-forget: awaiting the SMTP send would make responses for real
+  // accounts slower than for unknown ones, leaking account existence via timing.
+  void sendPasswordResetEmail({
     to: user.email,
     name: user.name,
     url: `${env.APP_URL}/reset-password/${token}`,
-  });
+  }).catch((err) => console.error("[reset] request email failed", err));
 }
 
 /**
