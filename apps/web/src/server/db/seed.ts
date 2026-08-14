@@ -36,17 +36,30 @@ async function main() {
   if (!admin) {
     [admin] = await db
       .insert(users)
-      .values({ name: adminName, email: adminEmail, passwordHash })
+      .values({
+        name: adminName,
+        email: adminEmail,
+        normalizedEmail: adminEmail,
+        passwordHash,
+        status: "active",
+        emailVerifiedAt: new Date(),
+      })
       .returning();
     console.log("✓ admin user created:", admin.email);
-  } else if (!admin.passwordHash) {
+  } else {
+    // Backfill fields introduced by the auth migration; upgrade password if unset.
     await db
       .update(users)
-      .set({ passwordHash })
+      .set({
+        normalizedEmail: admin.normalizedEmail ?? adminEmail,
+        status: "active",
+        passwordHash: admin.passwordHash ?? passwordHash,
+        // Reset lock state so re-seeding also unlocks the admin during dev.
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      })
       .where(eq(users.id, admin.id));
-    console.log("✓ admin password set:", admin.email);
-  } else {
-    console.log("• admin user exists:", admin.email);
+    console.log("• admin user updated (lock reset):", admin.email);
   }
 
   const existing = await db

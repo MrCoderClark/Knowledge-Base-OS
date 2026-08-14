@@ -15,6 +15,13 @@
       "when": 1786639116831,
       "tag": "0001_tiny_adam_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786644189055,
+      "tag": "0002_messy_lizard",
+      "breakpoints": true
     }
   ]
 }
