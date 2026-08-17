@@ -1,4 +1,6 @@
 import {
+  bigint,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -110,6 +112,185 @@ export const teamMembers = pgTable(
     role: teamRole("role").notNull().default("member"),
   },
   (t) => [unique().on(t.teamId, t.userId)],
+);
+
+/* ------------------------------------------------------------------ */
+/* Knowledge base content (see docs/specs/02-data-model.md)           */
+/* ------------------------------------------------------------------ */
+
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    parentId: uuid("parent_id"),
+    color: text("color"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    unique().on(t.orgId, t.slug),
+    foreignKey({
+      columns: [t.parentId],
+      foreignColumns: [t.id],
+      name: "categories_parent_id_fk",
+    }).onDelete("set null"),
+  ],
+);
+
+export const docStatus = pgEnum("doc_status", [
+  "draft",
+  "published",
+  "archived",
+]);
+export const docType = pgEnum("doc_type", ["authored", "uploaded"]);
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    categoryId: uuid("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    docType: docType("doc_type").notNull().default("authored"),
+    // Authored content (Tiptap JSON for editing + rendered HTML for display).
+    body: jsonb("body"),
+    bodyHtml: text("body_html"),
+    // Uploaded content (populated in slice 2b).
+    fileKey: text("file_key"),
+    mimeType: text("mime_type"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
+    status: docStatus("status").notNull().default("draft"),
+    currentVersion: integer("current_version").notNull().default(1),
+    createdBy: text("created_by").references(() => users.id),
+    updatedBy: text("updated_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    unique().on(t.orgId, t.slug),
+    index("documents_org_created_idx").on(t.orgId, t.createdAt),
+  ],
+);
+
+export const documentVersions = pgTable(
+  "document_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    body: jsonb("body"),
+    bodyHtml: text("body_html"),
+    changeNote: text("change_note"),
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [unique().on(t.documentId, t.version)],
+);
+
+export const videoStatus = pgEnum("video_status", [
+  "uploaded",
+  "processing",
+  "ready",
+  "failed",
+]);
+
+export const videos = pgTable(
+  "videos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+    categoryId: uuid("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    fileKey: text("file_key").notNull(),
+    mimeType: text("mime_type"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
+    // Phase 2 pipeline outputs (populated by the transcode worker).
+    mp4Key: text("mp4_key"),
+    hlsKey: text("hls_key"),
+    posterKey: text("poster_key"),
+    spriteKey: text("sprite_key"),
+    captionsKey: text("captions_key"),
+    durationSeconds: integer("duration_seconds"),
+    transcript: text("transcript"),
+    chapters: jsonb("chapters"),
+    processingError: text("processing_error"),
+    status: videoStatus("status").notNull().default("uploaded"),
+    createdBy: text("created_by").references(() => users.id),
+    updatedBy: text("updated_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    unique().on(t.orgId, t.slug),
+    index("videos_org_created_idx").on(t.orgId, t.createdAt),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* Async processing jobs (video transcode/transcribe — see spec 08)   */
+/* Next inserts a queued row; the Python worker claims + updates it.   */
+/* ------------------------------------------------------------------ */
+
+export const jobType = pgEnum("job_type", [
+  "video_transcode",
+  "video_transcribe",
+]);
+export const jobStatus = pgEnum("job_status", [
+  "queued",
+  "running",
+  "done",
+  "failed",
+]);
+
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    type: jobType("type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    status: jobStatus("status").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("jobs_status_idx").on(t.status)],
 );
 
 /* ------------------------------------------------------------------ */

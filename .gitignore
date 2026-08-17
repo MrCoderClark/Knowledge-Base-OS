@@ -1,0 +1,26 @@
+# Root safety-net ignores. Nested apps (e.g. apps/web) also have their own
+# .gitignore; these rules match at ANY depth to catch stray/doubled paths.
+
+# Dependencies & build output
+**/node_modules/
+**/.next/
+**/.storage/
+**/out/
+**/build/
+**/dist/
+**/.turbo/
+**/*.tsbuildinfo
+
+# Python (uv)
+**/.venv/
+**/__pycache__/
+**/*.pyc
+
+# Secrets (never commit real env files; .env.example is allowed)
+**/.env
+**/.env.local
+**/.env.*.local
+
+# OS / editor
+**/.DS_Store
+**/Thumbs.db

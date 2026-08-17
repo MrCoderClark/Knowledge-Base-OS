@@ -1,0 +1,13 @@
+[project]
+name = "ai"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.43.72",
+    "celery>=5.6.3",
+    "fastapi>=0.141.1",
+    "faster-whisper>=1.2.1",
+    "psycopg[binary]>=3.3.4",
+    "pydantic-settings>=2.15.0",
+    "uvicorn[standard]>=0.52.3",
+]

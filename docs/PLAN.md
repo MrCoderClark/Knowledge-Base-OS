@@ -92,6 +92,7 @@ and the exact boundary between the Next.js backend and the Python service.
 | [`05-features.md`](./specs/05-features.md) | Module-by-module functional specs + acceptance criteria |
 | [`06-design-system.md`](./specs/06-design-system.md) | DESIGN.md → Tailwind tokens + component contracts |
 | [`07-auth-security.md`](./specs/07-auth-security.md) | **Production auth** (custom server-side sessions, Argon2id, rate limiting, audit) per [`AUTHENTICATION.md`](./AUTHENTICATION.md) — supersedes the auth part of 03 |
+| [`08-video-processing.md`](./specs/08-video-processing.md) | **Phase 2 media pipeline** — self-hosted Python/FastAPI + ffmpeg (transcode, HLS, thumbnails, transcription) |
 
 ---
 
