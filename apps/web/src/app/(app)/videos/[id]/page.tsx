@@ -14,6 +14,7 @@ import { getActor, hasPermission } from "@/server/authz";
 import { getVideoWithMeta, relatedVideos } from "@/server/kb/videos";
 import { ChapterList } from "../ChapterList";
 import { PlayerProvider } from "../player-context";
+import { TranscriptPanel } from "../TranscriptPanel";
 import { VideoActionBar } from "../VideoActionBar";
 import { VideoActions } from "../VideoActions";
 import { VideoFailed } from "../VideoFailed";
@@ -185,10 +186,10 @@ export default async function VideoViewPage({
                   <FileText className="size-5 text-indigo" />
                   Transcript
                 </h2>
-                {video.transcript ? (
-                  <p className="max-h-64 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-body">
-                    {video.transcript}
-                  </p>
+                {video.captionsKey ? (
+                  <TranscriptPanel
+                    captionsUrl={`/api/videos/${video.id}/captions`}
+                  />
                 ) : (
                   <p className="text-sm text-muted">
                     Transcript is being generated…

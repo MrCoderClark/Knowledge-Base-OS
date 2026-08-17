@@ -1,22 +1,39 @@
 "use client";
 
 import type { MediaPlayerInstance } from "@vidstack/react";
-import { createContext, useContext, useMemo, useRef } from "react";
+import { createContext, useContext, useMemo, useRef, useState } from "react";
 
 type PlayerControls = {
   register: (player: MediaPlayerInstance | null) => void;
   seek: (seconds: number) => void;
 };
 
-const PlayerContext = createContext<PlayerControls | null>(null);
+// Two contexts: controls are stable (so the player's ref callback doesn't churn);
+// time changes ~1/sec and only components that read it re-render.
+const ControlsContext = createContext<PlayerControls | null>(null);
+const TimeContext = createContext<number>(0);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const ref = useRef<MediaPlayerInstance | null>(null);
+  const unsub = useRef<(() => void) | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
 
-  const value = useMemo<PlayerControls>(
+  const controls = useMemo<PlayerControls>(
     () => ({
       register: (player) => {
         ref.current = player;
+        unsub.current?.();
+        unsub.current = null;
+        if (player && typeof player.subscribe === "function") {
+          let last = -1;
+          unsub.current = player.subscribe((state) => {
+            const t = Math.floor(state.currentTime);
+            if (t !== last) {
+              last = t;
+              setCurrentTime(t);
+            }
+          });
+        }
       },
       seek: (seconds) => {
         const player = ref.current;
@@ -29,10 +46,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>
+    <ControlsContext.Provider value={controls}>
+      <TimeContext.Provider value={currentTime}>{children}</TimeContext.Provider>
+    </ControlsContext.Provider>
   );
 }
 
 export function usePlayerControls(): PlayerControls | null {
-  return useContext(PlayerContext);
+  return useContext(ControlsContext);
+}
+
+export function usePlayerTime(): number {
+  return useContext(TimeContext);
 }
