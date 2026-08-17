@@ -1,9 +1,10 @@
+import json
 import os
 import tempfile
 
 from celery.utils.log import get_task_logger
 
-from . import db, media, storage
+from . import db, media, storage, transcribe
 from .celery_app import celery
 
 logger = get_task_logger(__name__)
@@ -87,6 +88,16 @@ def transcode_video(self, job_id: str) -> None:
                 "WHERE id=%s",
                 (job_id,),
             )
+            # Video is now playable — kick off transcription as a follow-up job.
+            cur.execute("SELECT org_id FROM jobs WHERE id=%s", (job_id,))
+            org_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO jobs (org_id, type, target_id, status) "
+                "VALUES (%s, 'video_transcribe', %s, 'queued') RETURNING id",
+                (org_id, video_id),
+            )
+            transcribe_job_id = cur.fetchone()[0]
+        transcribe_video.delay(str(transcribe_job_id))
         logger.info("transcoded video %s", video_id)
 
     except Exception as exc:  # noqa: BLE001 — record + retry with backoff
@@ -107,6 +118,79 @@ def transcode_video(self, job_id: str) -> None:
                     )
         except Exception:  # noqa: BLE001
             logger.exception("failed to record job failure %s", job_id)
+        raise self.retry(exc=exc)
+    finally:
+        conn.close()
+
+
+@celery.task(
+    bind=True,
+    name="video.transcribe",
+    max_retries=2,
+    default_retry_delay=60,
+    acks_late=True,
+)
+def transcribe_video(self, job_id: str) -> None:
+    """Whisper → captions (VTT) + transcript + heuristic chapters."""
+    conn = db.connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE jobs SET status='running', attempts=attempts+1, "
+                "updated_at=now() WHERE id=%s RETURNING target_id",
+                (job_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return
+            video_id = row[0]
+            cur.execute(
+                "SELECT file_key, duration_seconds FROM videos WHERE id=%s",
+                (video_id,),
+            )
+            v = cur.fetchone()
+            if v is None:
+                return
+            file_key, duration = v
+
+        prefix = file_key.rsplit("/", 1)[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            src = os.path.join(tmp, "original")
+            storage.download(file_key, src)
+
+            segments = transcribe.transcribe(src)
+            vtt = transcribe.build_vtt(segments)
+            text = " ".join(t for _s, _e, t in segments if t).strip()
+            chapters = transcribe.build_chapters(segments, float(duration or 0))
+
+            captions_path = os.path.join(tmp, "captions.vtt")
+            with open(captions_path, "w", encoding="utf-8") as f:
+                f.write(vtt)
+            captions_key = f"{prefix}/captions.vtt"
+            storage.upload(captions_path, captions_key, "text/vtt")
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE videos SET captions_key=%s, transcript=%s, "
+                "chapters=%s::jsonb, updated_at=now() WHERE id=%s",
+                (captions_key, text, json.dumps(chapters), video_id),
+            )
+            cur.execute(
+                "UPDATE jobs SET status='done', updated_at=now() WHERE id=%s",
+                (job_id,),
+            )
+        logger.info("transcribed video %s (%d segments)", video_id, len(segments))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("transcribe failed for job %s", job_id)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE jobs SET status='failed', error=%s, updated_at=now() "
+                    "WHERE id=%s",
+                    (str(exc)[:500], job_id),
+                )
+        except Exception:  # noqa: BLE001
+            pass
         raise self.retry(exc=exc)
     finally:
         conn.close()

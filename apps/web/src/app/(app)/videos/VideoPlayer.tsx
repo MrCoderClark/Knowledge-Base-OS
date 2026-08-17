@@ -9,11 +9,13 @@ import {
   MediaPlayer,
   MediaProvider,
   type MediaProviderAdapter,
+  Track,
 } from "@vidstack/react";
 import {
   DefaultVideoLayout,
   defaultLayoutIcons,
 } from "@vidstack/react/player/layouts/default";
+import { usePlayerControls } from "./player-context";
 
 type Props = {
   src: string;
@@ -22,9 +24,13 @@ type Props = {
   title: string;
   /** WebVTT URL for timeline scrub previews. */
   thumbnails?: string;
+  /** WebVTT URL for the caption/subtitle track. */
+  captions?: string;
 };
 
-export function VideoPlayer({ src, type, title, thumbnails }: Props) {
+export function VideoPlayer({ src, type, title, thumbnails, captions }: Props) {
+  const controls = usePlayerControls();
+
   function onProviderChange(provider: MediaProviderAdapter | null) {
     // Use our bundled hls.js instead of Vidstack's default CDN load
     // (our CSP blocks external scripts).
@@ -35,6 +41,7 @@ export function VideoPlayer({ src, type, title, thumbnails }: Props) {
 
   return (
     <MediaPlayer
+      ref={(player) => controls?.register(player)}
       title={title}
       src={{ src, type: type as "video/mp4" }}
       playsInline
@@ -42,6 +49,15 @@ export function VideoPlayer({ src, type, title, thumbnails }: Props) {
       className="aspect-video w-full overflow-hidden rounded-xl border border-border"
     >
       <MediaProvider />
+      {captions && (
+        <Track
+          kind="subtitles"
+          src={captions}
+          label="English"
+          language="en"
+          default
+        />
+      )}
       <DefaultVideoLayout thumbnails={thumbnails} icons={defaultLayoutIcons} />
     </MediaPlayer>
   );

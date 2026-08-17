@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     s3_bucket: str = "knowledgeos"
     s3_region: str = "us-east-1"
     ai_service_token: str
+    whisper_model: str = "base"
 
 
 settings = Settings()  # type: ignore[call-arg]

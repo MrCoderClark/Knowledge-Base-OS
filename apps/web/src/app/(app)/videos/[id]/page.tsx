@@ -4,12 +4,16 @@ import {
   Calendar,
   Clock,
   Film,
+  FileText,
+  ListVideo,
   User,
 } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getActor, hasPermission } from "@/server/authz";
 import { getVideoWithMeta, relatedVideos } from "@/server/kb/videos";
+import { ChapterList } from "../ChapterList";
+import { PlayerProvider } from "../player-context";
 import { VideoActionBar } from "../VideoActionBar";
 import { VideoActions } from "../VideoActions";
 import { VideoFailed } from "../VideoFailed";
@@ -47,6 +51,8 @@ export default async function VideoViewPage({
 
   const related = await relatedVideos(actor.orgId, id);
   const duration = fmtDuration(video.durationSeconds);
+  const chapters =
+    (video.chapters as { start: number; title: string }[] | null) ?? [];
 
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
@@ -102,6 +108,7 @@ export default async function VideoViewPage({
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Main column */}
         <div className="space-y-6 lg:col-span-2">
+          <PlayerProvider>
           {video.status === "ready" ? (
             video.hlsKey ? (
               <VideoPlayer
@@ -113,6 +120,11 @@ export default async function VideoViewPage({
                     ? `/api/videos/${video.id}/sprite/sprite.vtt`
                     : undefined
                 }
+                captions={
+                  video.captionsKey
+                    ? `/api/videos/${video.id}/captions`
+                    : undefined
+                }
               />
             ) : (
               <VideoPlayer
@@ -122,6 +134,11 @@ export default async function VideoViewPage({
                 thumbnails={
                   video.spriteKey
                     ? `/api/videos/${video.id}/sprite/sprite.vtt`
+                    : undefined
+                }
+                captions={
+                  video.captionsKey
+                    ? `/api/videos/${video.id}/captions`
                     : undefined
                 }
               />
@@ -144,6 +161,43 @@ export default async function VideoViewPage({
               <VideoActionBar id={video.id} />
             </div>
           </div>
+
+          {video.status === "ready" && (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div className="rounded-xl border border-border bg-surface p-5">
+                <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-heading">
+                  <ListVideo className="size-5 text-indigo" />
+                  Chapters
+                </h2>
+                {chapters.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    {video.captionsKey
+                      ? "No chapters."
+                      : "Generating from the transcript…"}
+                  </p>
+                ) : (
+                  <ChapterList chapters={chapters} />
+                )}
+              </div>
+
+              <div className="rounded-xl border border-border bg-surface p-5">
+                <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-heading">
+                  <FileText className="size-5 text-indigo" />
+                  Transcript
+                </h2>
+                {video.transcript ? (
+                  <p className="max-h-64 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-body">
+                    {video.transcript}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted">
+                    Transcript is being generated…
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          </PlayerProvider>
         </div>
 
         {/* Up Next */}
