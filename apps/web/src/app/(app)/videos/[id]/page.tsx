@@ -103,11 +103,19 @@ export default async function VideoViewPage({
         {/* Main column */}
         <div className="space-y-6 lg:col-span-2">
           {video.status === "ready" ? (
-            <VideoPlayer
-              src={`/api/videos/${video.id}/file`}
-              mimeType="video/mp4"
-              title={video.title}
-            />
+            video.hlsKey ? (
+              <VideoPlayer
+                src={`/api/videos/${video.id}/hls/master.m3u8`}
+                type="application/vnd.apple.mpegurl"
+                title={video.title}
+              />
+            ) : (
+              <VideoPlayer
+                src={`/api/videos/${video.id}/file`}
+                type="video/mp4"
+                title={video.title}
+              />
+            )
           ) : video.status === "failed" ? (
             <VideoFailed
               id={video.id}

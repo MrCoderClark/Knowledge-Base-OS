@@ -53,6 +53,7 @@ export async function getVideoWithMeta(orgId: string, id: string) {
       description: videos.description,
       categoryId: videos.categoryId,
       mimeType: videos.mimeType,
+      hlsKey: videos.hlsKey,
       durationSeconds: videos.durationSeconds,
       status: videos.status,
       processingError: videos.processingError,

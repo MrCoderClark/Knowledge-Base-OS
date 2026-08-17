@@ -35,6 +35,9 @@ export function proxy(request: NextRequest): NextResponse {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' blob: data:`,
     `font-src 'self'`,
+    // hls.js plays via MSE (blob media source) and a blob-based web worker.
+    `media-src 'self' blob:`,
+    `worker-src 'self' blob:`,
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,

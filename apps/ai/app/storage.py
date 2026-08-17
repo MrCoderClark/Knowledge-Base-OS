@@ -1,7 +1,21 @@
+import os
+
 import boto3
 from botocore.config import Config
 
 from .config import settings
+
+
+def _content_type(name: str) -> str:
+    if name.endswith(".m3u8"):
+        return "application/vnd.apple.mpegurl"
+    if name.endswith(".m4s"):
+        return "video/iso.segment"
+    if name.endswith(".mp4"):
+        return "video/mp4"
+    if name.endswith(".jpg"):
+        return "image/jpeg"
+    return "application/octet-stream"
 
 
 def _client():
@@ -26,3 +40,18 @@ def upload(src_path: str, key: str, content_type: str) -> None:
         key,
         ExtraArgs={"ContentType": content_type},
     )
+
+
+def upload_dir(local_dir: str, key_prefix: str) -> None:
+    """Recursively upload a directory tree, preserving relative paths."""
+    client = _client()
+    for root, _dirs, files in os.walk(local_dir):
+        for name in files:
+            local = os.path.join(root, name)
+            rel = os.path.relpath(local, local_dir).replace("\\", "/")
+            client.upload_file(
+                local,
+                settings.s3_bucket,
+                f"{key_prefix}/{rel}",
+                ExtraArgs={"ContentType": _content_type(name)},
+            )

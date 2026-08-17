@@ -48,6 +48,9 @@ def transcode_video(self, job_id: str) -> None:
             storage.download(file_key, src)
 
             duration = media.probe_duration(src)
+            height = media.probe_height(src)
+
+            # 1) Compatibility MP4 (fallback + download) + poster.
             mp4_path = os.path.join(tmp, "video.mp4")
             poster_path = os.path.join(tmp, "poster.jpg")
             media.transcode_mp4(src, mp4_path)
@@ -58,11 +61,19 @@ def transcode_video(self, job_id: str) -> None:
             storage.upload(mp4_path, mp4_key, "video/mp4")
             storage.upload(poster_path, poster_key, "image/jpeg")
 
+            # 2) Adaptive HLS ladder.
+            hls_dir = os.path.join(tmp, "hls")
+            os.makedirs(hls_dir, exist_ok=True)
+            media.transcode_hls(src, hls_dir, height)
+            storage.upload_dir(hls_dir, f"{prefix}/hls")
+            hls_key = f"{prefix}/hls/master.m3u8"
+
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE videos SET mp4_key=%s, poster_key=%s, duration_seconds=%s, "
-                "status='ready', processing_error=NULL, updated_at=now() WHERE id=%s",
-                (mp4_key, poster_key, int(duration), video_id),
+                "UPDATE videos SET mp4_key=%s, hls_key=%s, poster_key=%s, "
+                "duration_seconds=%s, status='ready', processing_error=NULL, "
+                "updated_at=now() WHERE id=%s",
+                (mp4_key, hls_key, poster_key, int(duration), video_id),
             )
             cur.execute(
                 "UPDATE jobs SET status='done', error=NULL, updated_at=now() "
