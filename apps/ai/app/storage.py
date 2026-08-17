@@ -15,6 +15,8 @@ def _content_type(name: str) -> str:
         return "video/mp4"
     if name.endswith(".jpg"):
         return "image/jpeg"
+    if name.endswith(".vtt"):
+        return "text/vtt"
     return "application/octet-stream"
 
 

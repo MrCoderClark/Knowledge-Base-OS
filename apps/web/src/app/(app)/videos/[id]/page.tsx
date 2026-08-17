@@ -108,12 +108,22 @@ export default async function VideoViewPage({
                 src={`/api/videos/${video.id}/hls/master.m3u8`}
                 type="application/vnd.apple.mpegurl"
                 title={video.title}
+                thumbnails={
+                  video.spriteKey
+                    ? `/api/videos/${video.id}/sprite/sprite.vtt`
+                    : undefined
+                }
               />
             ) : (
               <VideoPlayer
                 src={`/api/videos/${video.id}/file`}
                 type="video/mp4"
                 title={video.title}
+                thumbnails={
+                  video.spriteKey
+                    ? `/api/videos/${video.id}/sprite/sprite.vtt`
+                    : undefined
+                }
               />
             )
           ) : video.status === "failed" ? (

@@ -68,12 +68,19 @@ def transcode_video(self, job_id: str) -> None:
             storage.upload_dir(hls_dir, f"{prefix}/hls")
             hls_key = f"{prefix}/hls/master.m3u8"
 
+            # 3) Scrub-preview sprite sheet + WebVTT.
+            sprite_dir = os.path.join(tmp, "sprite")
+            os.makedirs(sprite_dir, exist_ok=True)
+            media.sprite(src, sprite_dir, duration)
+            storage.upload_dir(sprite_dir, f"{prefix}/sprite")
+            sprite_key = f"{prefix}/sprite/sprite.vtt"
+
         with conn.cursor() as cur:
             cur.execute(
                 "UPDATE videos SET mp4_key=%s, hls_key=%s, poster_key=%s, "
-                "duration_seconds=%s, status='ready', processing_error=NULL, "
-                "updated_at=now() WHERE id=%s",
-                (mp4_key, hls_key, poster_key, int(duration), video_id),
+                "sprite_key=%s, duration_seconds=%s, status='ready', "
+                "processing_error=NULL, updated_at=now() WHERE id=%s",
+                (mp4_key, hls_key, poster_key, sprite_key, int(duration), video_id),
             )
             cur.execute(
                 "UPDATE jobs SET status='done', error=NULL, updated_at=now() "

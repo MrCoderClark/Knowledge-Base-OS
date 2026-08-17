@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import subprocess
 
@@ -100,3 +101,46 @@ def transcode_hls(src: str, out_dir: str, source_height: int) -> None:
         lines.append(uri)
     with open(os.path.join(out_dir, "master.m3u8"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
+
+
+_SPRITE_COLS = 10
+_SPRITE_W = 160
+_SPRITE_H = 90
+
+
+def _vtt_ts(seconds: int) -> str:
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}.000"
+
+
+def sprite(src: str, out_dir: str, duration: float) -> None:
+    """
+    A single tiled sprite sheet (160x90 thumbs, 10 wide) + a WebVTT that maps
+    time ranges to sprite regions, for timeline hover-preview.
+    """
+    total = int(duration)
+    interval = max(2, math.ceil(total / 100)) if total > 0 else 2
+    count = max(1, total // interval + 1)
+    rows = math.ceil(count / _SPRITE_COLS)
+
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", os.path.abspath(src),
+         "-vf",
+         f"fps=1/{interval},scale={_SPRITE_W}:{_SPRITE_H},"
+         f"tile={_SPRITE_COLS}x{rows}",
+         "-frames:v", "1", os.path.join(out_dir, "sprite.jpg")],
+        check=True, timeout=TRANSCODE_TIMEOUT,
+    )
+
+    lines = ["WEBVTT", ""]
+    for i in range(count):
+        start = i * interval
+        end = min((i + 1) * interval, total) if total > 0 else interval
+        x = (i % _SPRITE_COLS) * _SPRITE_W
+        y = (i // _SPRITE_COLS) * _SPRITE_H
+        lines.append(f"{_vtt_ts(start)} --> {_vtt_ts(end)}")
+        lines.append(f"sprite.jpg#xywh={x},{y},{_SPRITE_W},{_SPRITE_H}")
+        lines.append("")
+    with open(os.path.join(out_dir, "sprite.vtt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))

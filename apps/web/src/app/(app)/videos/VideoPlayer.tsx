@@ -20,9 +20,11 @@ type Props = {
   /** e.g. "application/vnd.apple.mpegurl" for HLS, "video/mp4" otherwise. */
   type: string;
   title: string;
+  /** WebVTT URL for timeline scrub previews. */
+  thumbnails?: string;
 };
 
-export function VideoPlayer({ src, type, title }: Props) {
+export function VideoPlayer({ src, type, title, thumbnails }: Props) {
   function onProviderChange(provider: MediaProviderAdapter | null) {
     // Use our bundled hls.js instead of Vidstack's default CDN load
     // (our CSP blocks external scripts).
@@ -40,7 +42,7 @@ export function VideoPlayer({ src, type, title }: Props) {
       className="aspect-video w-full overflow-hidden rounded-xl border border-border"
     >
       <MediaProvider />
-      <DefaultVideoLayout icons={defaultLayoutIcons} />
+      <DefaultVideoLayout thumbnails={thumbnails} icons={defaultLayoutIcons} />
     </MediaPlayer>
   );
 }
