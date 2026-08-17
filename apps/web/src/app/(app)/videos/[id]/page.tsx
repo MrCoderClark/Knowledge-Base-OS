@@ -12,7 +12,9 @@ import { getActor, hasPermission } from "@/server/authz";
 import { getVideoWithMeta, relatedVideos } from "@/server/kb/videos";
 import { VideoActionBar } from "../VideoActionBar";
 import { VideoActions } from "../VideoActions";
+import { VideoFailed } from "../VideoFailed";
 import { VideoPlayer } from "../VideoPlayer";
+import { VideoProcessing } from "../VideoProcessing";
 
 function fmtDuration(s: number | null): string | null {
   if (!s) return null;
@@ -100,11 +102,21 @@ export default async function VideoViewPage({
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Main column */}
         <div className="space-y-6 lg:col-span-2">
-          <VideoPlayer
-            src={`/api/videos/${video.id}/file`}
-            mimeType={video.mimeType}
-            title={video.title}
-          />
+          {video.status === "ready" ? (
+            <VideoPlayer
+              src={`/api/videos/${video.id}/file`}
+              mimeType="video/mp4"
+              title={video.title}
+            />
+          ) : video.status === "failed" ? (
+            <VideoFailed
+              id={video.id}
+              error={video.processingError}
+              canRetry={hasPermission(actor.role, "video:update")}
+            />
+          ) : (
+            <VideoProcessing />
+          )}
 
           <div className="rounded-xl border border-border bg-surface p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -130,8 +142,19 @@ export default async function VideoViewPage({
                 return (
                   <li key={r.id}>
                     <Link href={`/videos/${r.id}`} className="group flex gap-3">
-                      <div className="relative flex h-14 w-24 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-soft to-nav-active">
-                        <Film className="size-5 text-indigo/70" />
+                      <div className="relative h-14 w-24 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-indigo-soft to-nav-active">
+                        {r.posterKey ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={`/api/videos/${r.id}/poster`}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center">
+                            <Film className="size-5 text-indigo/70" />
+                          </span>
+                        )}
                         {d && (
                           <span className="absolute bottom-1 right-1 rounded bg-slate/80 px-1 text-[10px] font-medium text-white">
                             {d}

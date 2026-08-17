@@ -1,0 +1,84 @@
+# Local video-processing infrastructure (prod parity). All free/OSS, self-hosted.
+# Postgres is Neon (external); Next runs on the host and reaches ai-api + MinIO
+# via the published ports below.
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672" # broker
+      - "15672:15672" # management UI (guest/guest)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # console (minioadmin/minioadmin)
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Creates the bucket then exits.
+  minio-setup:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (mc alias set local http://minio:9000 minioadmin minioadmin) do echo waiting for minio; sleep 1; done;
+      mc mb --ignore-existing local/knowledgeos;
+      echo bucket ready;
+      exit 0;
+      "
+
+  # Containerized Python service (opt-in: `docker compose --profile full up`).
+  # For day-to-day dev, run the API + worker natively with uv instead (see apps/ai/README).
+  # These override the endpoint envs to use in-network hostnames.
+  ai-api:
+    build: ./apps/ai
+    profiles: ["full"]
+    env_file:
+      - ./apps/ai/.env
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//
+      S3_ENDPOINT: http://minio:9000
+    ports:
+      - "8001:8001"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  ai-worker:
+    build: ./apps/ai
+    profiles: ["full"]
+    env_file:
+      - ./apps/ai/.env
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//
+      S3_ENDPOINT: http://minio:9000
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+volumes:
+  minio-data:

@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   const ext = path.extname(file.name).slice(0, 12);
   const key = `documents/${actor.orgId}/${crypto.randomUUID()}${ext}`;
-  await putFile(key, Buffer.from(await file.arrayBuffer()));
+  await putFile(key, Buffer.from(await file.arrayBuffer()), file.type);
 
   const id = await createUploadedDocument({
     orgId: actor.orgId,

@@ -15,10 +15,12 @@ export async function GET(
   const video = await getVideo(actor.orgId, id);
   if (!video?.fileKey) return new NextResponse("Not found", { status: 404 });
 
-  const type = video.mimeType ?? "video/mp4";
+  // Prefer the transcoded MP4 once the pipeline has produced it.
+  const key = video.mp4Key ?? video.fileKey;
+  const type = video.mp4Key ? "video/mp4" : (video.mimeType ?? "video/mp4");
   let size: number;
   try {
-    size = await fileSize(video.fileKey);
+    size = await fileSize(key);
   } catch {
     return new NextResponse("File missing", { status: 404 });
   }
@@ -35,7 +37,7 @@ export async function GET(
         headers: { "Content-Range": `bytes */${size}` },
       });
     }
-    const buffer = await readFileRange(video.fileKey, start, end);
+    const buffer = await readFileRange(key, start, end);
     return new NextResponse(new Uint8Array(buffer), {
       status: 206,
       headers: {
@@ -48,7 +50,7 @@ export async function GET(
     });
   }
 
-  const buffer = await readFileBuffer(video.fileKey);
+  const buffer = await readFileBuffer(key);
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": type,

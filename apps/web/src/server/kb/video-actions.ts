@@ -1,10 +1,29 @@
 "use server";
 
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/server/authz";
+import { db } from "@/server/db";
+import { videos } from "@/server/db/schema";
+import { enqueueVideoTranscode } from "./jobs";
 import type { VideoEditState } from "./kb-types";
 import { deleteVideo, updateVideo } from "./videos";
+
+export async function retryVideoAction(id: string): Promise<void> {
+  let actor;
+  try {
+    actor = await requirePermission("video:update");
+  } catch {
+    return;
+  }
+  await db
+    .update(videos)
+    .set({ status: "processing", processingError: null, updatedAt: new Date() })
+    .where(and(eq(videos.id, id), eq(videos.orgId, actor.orgId)));
+  await enqueueVideoTranscode(actor.orgId, id);
+  revalidatePath(`/videos/${id}`);
+}
 
 export async function updateVideoAction(
   _prev: VideoEditState,

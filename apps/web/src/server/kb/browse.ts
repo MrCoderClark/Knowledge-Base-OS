@@ -8,6 +8,7 @@ export type BrowseItem = {
   title: string;
   docType: string;
   mimeType: string | null;
+  posterKey: string | null;
   categoryName: string | null;
   categoryColor: string | null;
   excerpt: string;
@@ -58,6 +59,7 @@ export async function browseDocuments(
     title: r.title,
     docType: r.docType,
     mimeType: r.mimeType,
+    posterKey: null,
     categoryName: r.categoryName,
     categoryColor: r.categoryColor,
     authorName: r.authorName,
@@ -82,6 +84,7 @@ export async function browseVideos(
       id: videos.id,
       title: videos.title,
       mimeType: videos.mimeType,
+      posterKey: videos.posterKey,
       categoryName: categories.name,
       categoryColor: categories.color,
       authorName: users.name,
@@ -100,6 +103,7 @@ export async function browseVideos(
     title: r.title,
     docType: "video",
     mimeType: r.mimeType,
+    posterKey: r.posterKey,
     categoryName: r.categoryName,
     categoryColor: r.categoryColor,
     authorName: r.authorName,

@@ -263,11 +263,20 @@ export default async function KnowledgeBasePage({
                     href={itemHref(item)}
                     className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-border-strong"
                   >
-                    <div className="relative flex h-32 items-center justify-center bg-gradient-to-br from-indigo-soft to-nav-active">
-                      <span className="absolute right-3 top-3 rounded-md bg-surface/80 px-2 py-0.5 text-xs font-semibold text-body">
+                    <div className="relative flex h-32 items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-soft to-nav-active">
+                      <span className="absolute right-3 top-3 z-10 rounded-md bg-surface/80 px-2 py-0.5 text-xs font-semibold text-body">
                         {label}
                       </span>
-                      <Icon className="size-10 text-indigo/70" strokeWidth={1.5} />
+                      {item.kind === "video" && item.posterKey ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/videos/${item.id}/poster`}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Icon className="size-10 text-indigo/70" strokeWidth={1.5} />
+                      )}
                     </div>
                     <div className="flex flex-1 flex-col p-4">
                       {item.categoryName && (

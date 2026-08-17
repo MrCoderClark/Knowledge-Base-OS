@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { type NextRequest, NextResponse } from "next/server";
 import { getActor, hasPermission } from "@/server/authz";
+import { enqueueVideoTranscode } from "@/server/kb/jobs";
 import { createUploadedVideo } from "@/server/kb/videos";
 import { putFile } from "@/server/storage";
 
@@ -45,9 +46,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unsupported video type (MP4/WebM/OGG/MOV)." }, { status: 415 });
   }
 
+  // One folder per video asset so the worker can write outputs alongside it.
   const ext = path.extname(file.name).slice(0, 12);
-  const key = `videos/${actor.orgId}/${crypto.randomUUID()}${ext}`;
-  await putFile(key, Buffer.from(await file.arrayBuffer()));
+  const assetId = crypto.randomUUID();
+  const key = `videos/${actor.orgId}/${assetId}/original${ext}`;
+  await putFile(key, Buffer.from(await file.arrayBuffer()), file.type);
 
   const id = await createUploadedVideo({
     orgId: actor.orgId,
@@ -60,6 +63,9 @@ export async function POST(req: NextRequest) {
     durationSeconds,
     createdBy: actor.userId,
   });
+
+  // Kick off transcode → MP4 + poster (async; status flips to ready when done).
+  await enqueueVideoTranscode(actor.orgId, id);
 
   return NextResponse.json({ id });
 }

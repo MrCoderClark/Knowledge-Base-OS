@@ -1,59 +1,91 @@
-import { mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
+import {
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { env } from "@/server/env";
 
 /**
- * File storage — currently the local filesystem. This module is the single
- * boundary; replace it with an S3/object-storage implementation later without
- * changing callers. Keys are relative paths like `documents/<orgId>/<uuid>.pdf`.
+ * Object storage (MinIO / S3-compatible). Same interface the document/video
+ * routes already use, so callers are unchanged. `forcePathStyle` is required
+ * for MinIO.
  */
-const BASE = path.resolve(process.cwd(), env.STORAGE_DIR);
+const s3 = new S3Client({
+  endpoint: env.S3_ENDPOINT,
+  region: env.S3_REGION,
+  credentials: {
+    accessKeyId: env.S3_ACCESS_KEY,
+    secretAccessKey: env.S3_SECRET_KEY,
+  },
+  forcePathStyle: true,
+});
 
-function resolveKey(key: string): string {
-  const full = path.resolve(BASE, key);
-  // Guard against path traversal escaping the storage root.
-  if (full !== BASE && !full.startsWith(BASE + path.sep)) {
-    throw new Error("Invalid storage key");
-  }
-  return full;
+const Bucket = env.S3_BUCKET;
+
+export async function putFile(
+  key: string,
+  data: Buffer,
+  contentType?: string,
+): Promise<void> {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket,
+      Key: key,
+      Body: data,
+      ContentType: contentType,
+    }),
+  );
 }
 
-export async function putFile(key: string, data: Buffer): Promise<void> {
-  const full = resolveKey(key);
-  await mkdir(path.dirname(full), { recursive: true });
-  await writeFile(full, data);
-}
-
-export function readFileBuffer(key: string): Promise<Buffer> {
-  return readFile(resolveKey(key));
+export async function readFileBuffer(key: string): Promise<Buffer> {
+  const res = await s3.send(new GetObjectCommand({ Bucket, Key: key }));
+  const bytes = await res.Body!.transformToByteArray();
+  return Buffer.from(bytes);
 }
 
 export async function fileSize(key: string): Promise<number> {
-  const s = await stat(resolveKey(key));
-  return s.size;
+  const res = await s3.send(new HeadObjectCommand({ Bucket, Key: key }));
+  return res.ContentLength ?? 0;
 }
 
-/** Read a byte range [start, end] inclusive — used for HTTP Range responses. */
 export async function readFileRange(
   key: string,
   start: number,
   end: number,
 ): Promise<Buffer> {
-  const length = end - start + 1;
-  const fh = await open(resolveKey(key), "r");
-  try {
-    const buf = Buffer.alloc(length);
-    await fh.read(buf, 0, length, start);
-    return buf;
-  } finally {
-    await fh.close();
-  }
+  const res = await s3.send(
+    new GetObjectCommand({ Bucket, Key: key, Range: `bytes=${start}-${end}` }),
+  );
+  const bytes = await res.Body!.transformToByteArray();
+  return Buffer.from(bytes);
 }
 
 export async function deleteFile(key: string): Promise<void> {
-  try {
-    await unlink(resolveKey(key));
-  } catch {
-    // Already gone — nothing to do.
-  }
+  await s3.send(new DeleteObjectCommand({ Bucket, Key: key }));
+}
+
+/** Delete every object under a prefix (e.g. a video asset's whole folder). */
+export async function deletePrefix(prefix: string): Promise<void> {
+  let ContinuationToken: string | undefined;
+  do {
+    const list = await s3.send(
+      new ListObjectsV2Command({ Bucket, Prefix: prefix, ContinuationToken }),
+    );
+    const objects = (list.Contents ?? [])
+      .map((o) => o.Key)
+      .filter((k): k is string => Boolean(k))
+      .map((Key) => ({ Key }));
+    if (objects.length > 0) {
+      await s3.send(
+        new DeleteObjectsCommand({ Bucket, Delete: { Objects: objects } }),
+      );
+    }
+    ContinuationToken = list.IsTruncated
+      ? list.NextContinuationToken
+      : undefined;
+  } while (ContinuationToken);
 }

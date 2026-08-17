@@ -11,6 +11,11 @@
 **/.turbo/
 **/*.tsbuildinfo
 
+# Python (uv)
+**/.venv/
+**/__pycache__/
+**/*.pyc
+
 # Secrets (never commit real env files; .env.example is allowed)
 **/.env
 **/.env.local

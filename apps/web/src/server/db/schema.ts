@@ -229,11 +229,17 @@ export const videos = pgTable(
     fileKey: text("file_key").notNull(),
     mimeType: text("mime_type"),
     sizeBytes: bigint("size_bytes", { mode: "number" }),
-    // Phase 2: transcode output, poster frame, transcript.
+    // Phase 2 pipeline outputs (populated by the transcode worker).
+    mp4Key: text("mp4_key"),
+    hlsKey: text("hls_key"),
     posterKey: text("poster_key"),
+    spriteKey: text("sprite_key"),
+    captionsKey: text("captions_key"),
     durationSeconds: integer("duration_seconds"),
     transcript: text("transcript"),
-    status: videoStatus("status").notNull().default("ready"),
+    chapters: jsonb("chapters"),
+    processingError: text("processing_error"),
+    status: videoStatus("status").notNull().default("uploaded"),
     createdBy: text("created_by").references(() => users.id),
     updatedBy: text("updated_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -247,6 +253,44 @@ export const videos = pgTable(
     unique().on(t.orgId, t.slug),
     index("videos_org_created_idx").on(t.orgId, t.createdAt),
   ],
+);
+
+/* ------------------------------------------------------------------ */
+/* Async processing jobs (video transcode/transcribe — see spec 08)   */
+/* Next inserts a queued row; the Python worker claims + updates it.   */
+/* ------------------------------------------------------------------ */
+
+export const jobType = pgEnum("job_type", [
+  "video_transcode",
+  "video_transcribe",
+]);
+export const jobStatus = pgEnum("job_status", [
+  "queued",
+  "running",
+  "done",
+  "failed",
+]);
+
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    type: jobType("type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    status: jobStatus("status").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("jobs_status_idx").on(t.status)],
 );
 
 /* ------------------------------------------------------------------ */

@@ -1,7 +1,7 @@
 import { and, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/server/db";
 import { categories, users, videos } from "@/server/db/schema";
-import { deleteFile } from "@/server/storage";
+import { deletePrefix } from "@/server/storage";
 import { slugify } from "./categories";
 
 export type Video = typeof videos.$inferSelect;
@@ -54,6 +54,8 @@ export async function getVideoWithMeta(orgId: string, id: string) {
       categoryId: videos.categoryId,
       mimeType: videos.mimeType,
       durationSeconds: videos.durationSeconds,
+      status: videos.status,
+      processingError: videos.processingError,
       createdAt: videos.createdAt,
       categoryName: categories.name,
       categoryColor: categories.color,
@@ -73,6 +75,7 @@ export function relatedVideos(orgId: string, currentId: string, limit = 6) {
       id: videos.id,
       title: videos.title,
       durationSeconds: videos.durationSeconds,
+      posterKey: videos.posterKey,
       categoryName: categories.name,
     })
     .from(videos)
@@ -112,7 +115,8 @@ export async function createUploadedVideo(params: {
       mimeType: params.mimeType,
       sizeBytes: params.sizeBytes,
       durationSeconds: params.durationSeconds,
-      status: "ready",
+      // Pipeline will transcode + poster, then flip to `ready`.
+      status: "processing",
       createdBy: params.createdBy,
       updatedBy: params.createdBy,
     })
@@ -146,7 +150,13 @@ export async function deleteVideo(params: {
 }): Promise<void> {
   const video = await getVideo(params.orgId, params.id);
   if (!video) return;
-  if (video.fileKey) await deleteFile(video.fileKey);
+  // Remove the whole asset folder (original + mp4 + poster + hls…).
+  if (video.fileKey) {
+    const prefix = video.fileKey.includes("/")
+      ? video.fileKey.slice(0, video.fileKey.lastIndexOf("/") + 1)
+      : "";
+    if (prefix) await deletePrefix(prefix);
+  }
   await db
     .delete(videos)
     .where(and(eq(videos.id, video.id), eq(videos.orgId, params.orgId)));

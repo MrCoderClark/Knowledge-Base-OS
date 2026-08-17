@@ -1,190 +1,185 @@
 # Spec 08 — Video Processing Pipeline (Design)
 
-Status: **Design — awaiting sign-off** · Phase: 2 (media track) · Owner: TBD
+Status: **Design — building** · Phase: 2 (media track) · Owner: TBD
 
-Self-hosted video processing: transcode uploads for browser compatibility, produce
-**HLS** for adaptive streaming, generate posters/thumbnails, and (later) transcribe for
-captions/transcript/chapters. Realizes the Phase-2 "Python service + video processing"
-from [`01-architecture.md`](./01-architecture.md).
+Production-grade, **self-hosted, 100% free/OSS** video pipeline: transcode uploads for
+compatibility, produce **adaptive HLS**, generate posters/sprites, and (later) transcribe
+for captions/transcript/chapters. Realizes the Phase-2 media service from
+[`01-architecture.md`](./01-architecture.md).
 
-Decision (2026-08-17): **self-host** (Python + ffmpeg), not a managed platform.
-
----
-
-## 1. Why (situations this solves)
-
-Phase-1 played the **original** uploaded file. That fails as video scales:
-- **Compatibility** — `.mov`/odd codecs don't play everywhere → transcode to H.264 MP4.
-- **Delivery/seeking** — streaming one big file is slow → **HLS** adaptive renditions.
-- **Thumbnails** — reliable poster + hover-scrub sprites → ffmpeg frame extraction.
-- **Training features** — captions, transcript, chapters, in-video search → transcription.
+Decisions (2026-08-17): **self-host**; **Celery + RabbitMQ**; **MinIO** (S3-compatible)
+object storage; everything **containerized (Docker Compose)** for prod parity.
 
 ---
 
-## 2. Architecture
+## 1. Architecture
 
 ```
-Browser ─upload─► Next (route handler) ─┐
-                                        ├─► store original (storage module)
-                                        ├─► insert `jobs` row (queued) + video.status=processing
-                                        └─► POST /jobs  ──HTTP (shared token)──► FastAPI
-                                                                                  │ enqueue (RQ)
-                                                                                  ▼
-                                                                            Redis (broker)
-                                                                                  │
-                                                                            RQ worker(s)
-                                                                            ├─ ffprobe (duration)
-                                                                            ├─ ffmpeg → MP4 (H.264)
-                                                                            ├─ ffmpeg → HLS renditions
-                                                                            ├─ ffmpeg → poster + sprite
-                                                                            └─ (2d) whisper → captions
-                                                                                  │ write results
-                                                                                  ▼
-                                                             Postgres (video.status=ready, keys, duration)
-                                                             + storage (hls/, poster.jpg, captions.vtt)
+Browser ─upload─► Next (route handler)
+                    ├─ PUT original ─────────────► MinIO (S3)      [apps/web storage → S3]
+                    ├─ INSERT jobs(queued) + video.status=processing (Postgres)
+                    └─ POST /jobs {jobId} ──HTTP(Bearer)──► FastAPI (apps/ai)
+                                                              │ celery_task.delay(jobId)
+                                                              ▼
+                                                          RabbitMQ (broker)
+                                                              │
+                                                       Celery worker(s)  [ffmpeg]
+                                                       ├─ GET original ◄─ MinIO
+                                                       ├─ ffprobe → duration
+                                                       ├─ ffmpeg → MP4 (H.264/AAC)
+                                                       ├─ ffmpeg → HLS renditions (2b)
+                                                       ├─ ffmpeg → poster (+ sprite 2c)
+                                                       ├─ whisper → captions (2d)
+                                                       ├─ PUT outputs ─► MinIO
+                                                       └─ UPDATE videos(keys,duration,ready)
+                                                                 + jobs(done|failed)  (Postgres)
 
-Browser ◄─HLS (m3u8 + segments)── Next route (auth + org-scoped) ◄─ storage
+Browser ◄─ signed URL / stream ── Next route (auth + org-scoped) ── MinIO
 ```
 
-- **Shared infra:** the Python service and Next share the **same Postgres** (results) and
-  **same Redis** (RQ broker — we already run Redis). **Storage** is the existing storage
-  module (local FS now; swappable to object storage for multi-instance/scale).
-- **Front door:** Next is the only thing the browser talks to. Next→FastAPI is
-  server-to-server, authenticated with `AI_SERVICE_TOKEN`. FastAPI is also where the
-  Phase-2 AI (`/chat`, transcription) will live.
-- **Node can't enqueue RQ jobs directly** (RQ jobs are Python), so Next enqueues via the
-  FastAPI HTTP endpoint; the `jobs` table is the source of truth for status/retries.
+- **Shared state:** Next and the worker share the **same Neon Postgres** (`jobs` +
+  `videos` are the source of truth Next reads) and the **same MinIO bucket**.
+- **Front door:** the browser only talks to Next. Next→FastAPI is server-to-server,
+  `Authorization: Bearer AI_SERVICE_TOKEN`. FastAPI later also hosts AI `/chat`.
+- **Why Celery+RabbitMQ:** durable queues, acks, retries+backoff, dead-letter,
+  concurrency/priorities, Flower monitoring — the right posture for long transcode jobs.
+  (RQ was rejected: `os.fork` dependency; DB-polling rejected: not a real queue.)
 
 ---
 
-## 3. Data model changes
+## 2. Data model
 
-Reuse existing `videos` columns (`posterKey`, `durationSeconds`, `transcript`,
-`status` enum already exist). Add:
+Reuse existing `videos` columns (`poster_key`, `duration_seconds`, `transcript`,
+`status`). Add to **`videos`**: `mp4_key`, `hls_key`, `sprite_key`, `captions_key`,
+`processing_error`, `chapters` (jsonb, 2d).
 
-- **`videos`**: `hls_key` (text, master playlist path), `sprite_key` (text),
-  `captions_key` (text), `processing_error` (text), `chapters` (jsonb, 2d).
-- **`jobs`** (new — the Phase-2 seam from spec 01, finally built):
-  `id, org_id, type ('video_transcode' | 'video_transcribe'), target_type, target_id,
-  status ('queued'|'running'|'done'|'failed'), attempts, error, created_at, updated_at`.
+New **`jobs`** table: `id, org_id, type ('video_transcode'|'video_transcribe'),
+target_id (videoId), status ('queued'|'running'|'done'|'failed'), attempts, error,
+created_at, updated_at`.
 
-`video.status` flow: `uploaded → processing → ready | failed`.
+`video.status`: `uploaded → processing → ready | failed`.
+
+---
+
+## 3. Storage (MinIO / S3)
+
+- One bucket (e.g. `knowledgeos`). Key layout:
+  ```
+  videos/<orgId>/<assetId>/original.<ext>
+                          /video.mp4
+                          /hls/master.m3u8 + <rendition>/*.m4s   (2b)
+                          /poster.jpg
+                          /sprite.jpg + sprite.vtt               (2c)
+                          /captions.vtt                          (2d)
+  documents/<orgId>/<assetId>.<ext>
+  ```
+- **Next storage module reimplemented against S3** (`@aws-sdk/client-s3`) keeping the same
+  interface (`putFile/readFileBuffer/readFileRange/fileSize/deleteFile`), so existing
+  document/video routes keep working. Adds `getSignedGetUrl` for delivery.
+- **Delivery:** Next validates auth + org, then serves via a short-lived **presigned GET**
+  (offloads bandwidth from Node; supports Range/seeking). HLS segments delivered the same
+  way (2b); CDN in front for real prod.
+- Worker uses **boto3** against the same bucket.
 
 ---
 
 ## 4. Processing steps (worker)
 
-1. **Probe** — `ffprobe` for duration, resolution, codec.
-2. **MP4 (compat)** — `ffmpeg` H.264/AAC faststart MP4 (fallback + download).
-3. **HLS** — `ffmpeg` renditions (e.g. 1080p/720p/480p/360p, capped at source) → per-
-   rendition playlists + a master `m3u8`.
-4. **Poster** — frame at ~10% (or a chosen time) → `poster.jpg` (downscaled).
-5. **Sprite** *(2c)* — tiled thumbnails + WebVTT for scrub previews.
-6. **Transcribe** *(2d)* — `faster-whisper` → `captions.vtt` + plain transcript +
-   naive chapters.
-7. Write keys + `duration_seconds` + `status='ready'` (or `failed` + `processing_error`).
+1. `ffprobe` → duration/resolution/codec.
+2. **MP4** — H.264/AAC, `+faststart` (fallback + download).
+3. **HLS** — CMAF/fMP4 ladder (1080/720/480/360, capped at source) + master manifest. *(2b)*
+4. **Poster** — frame at ~10% → downscaled `poster.jpg`.
+5. **Sprite** — tiled thumbs + WebVTT for scrub. *(2c)*
+6. **Transcribe** — `faster-whisper` → `captions.vtt` + transcript + chapters. *(2d)*
+7. Write keys + duration + `status='ready'` (or `failed` + `processing_error`).
 
-**Security in the worker:** never build ffmpeg commands from shell strings — use argument
-arrays (no `shell=True`); validate/whitelist inputs; run with time/size limits; write only
-under the video's storage prefix.
+**Security:** ffmpeg via **argument arrays** (no shell), probe/validate inputs, per-job
+**timeouts + resource limits**, write only under the asset prefix, temp-dir cleanup.
 
 ---
 
-## 5. Playback
-
-- Once `ready`, the player loads **HLS** (`hls_key`) via Vidstack (built-in HLS). While
-  `processing`, the UI shows a "Processing…" state; `failed` shows an error + retry (admin).
-- **Serving:** a Next route streams the manifest + segments (auth + org-scoped), same as
-  the current file route. Vidstack/hls.js fetch segments same-origin (cookie auth).
-- **CSP:** hls.js uses a blob worker → add `worker-src 'self' blob:` and `media-src 'self'`
-  to `src/proxy.ts`. Documented exception.
-
----
-
-## 6. Python service (`apps/ai`)
+## 5. Python service (`apps/ai`)
 
 ```
 apps/ai/
-├─ pyproject.toml         # fastapi, uvicorn, rq, redis, psycopg, faster-whisper (2d), pydantic-settings
+├─ Dockerfile              # python:3.12-slim + ffmpeg
+├─ requirements.txt        # fastapi, uvicorn, celery, boto3, psycopg[binary], pydantic-settings
+├─ pyproject/.env.example
 ├─ app/
-│  ├─ main.py             # FastAPI: POST /jobs (token-auth), GET /health
-│  ├─ config.py           # env (DATABASE_URL, REDIS_URL, STORAGE_DIR, AI_SERVICE_TOKEN)
-│  ├─ queue.py            # RQ queue
-│  ├─ db.py               # psycopg to the shared Postgres
-│  ├─ storage.py          # same key scheme as the TS storage module
-│  ├─ jobs/transcode.py   # ffmpeg/ffprobe pipeline
-│  └─ jobs/transcribe.py  # whisper (2d)
-└─ worker.py              # RQ worker entrypoint
+│  ├─ main.py              # FastAPI: POST /jobs (Bearer), GET /health
+│  ├─ config.py            # env settings
+│  ├─ celery_app.py        # Celery(broker=RabbitMQ)
+│  ├─ db.py                # psycopg pool to Neon
+│  ├─ storage.py           # boto3 (MinIO) get/put
+│  ├─ media.py             # ffprobe/ffmpeg helpers (arg-arrays)
+│  └─ tasks.py             # transcode task (2a), transcribe (2d)
 ```
 
-Runs as two processes: `uvicorn app.main:app` (API) and `rq worker` (jobs). ffmpeg must
-be on PATH. Dev on Windows: Python 3.11+, ffmpeg binary, existing Redis.
+Two roles from one image: **API** (`uvicorn app.main:app`) and **worker**
+(`celery -A app.celery_app worker`). Later: **Flower** for monitoring.
 
 ---
 
-## 7. Storage layout
+## 6. Docker Compose (local = prod parity)
 
-```
-videos/<orgId>/<videoId>/original.<ext>
-                         /video.mp4
-                         /hls/master.m3u8  + <rendition>/*.m3u8, *.ts
-                         /poster.jpg
-                         /sprite.jpg + sprite.vtt   (2c)
-                         /captions.vtt              (2d)
-```
+Services: `rabbitmq` (mgmt UI 15672), `minio` (API 9000 / console 9001),
+`minio-setup` (creates the bucket), `ai-api` (FastAPI :8000), `ai-worker` (Celery),
+`flower` (:5555, later). Postgres is Neon (external); Next runs on the host and reaches
+`ai-api`/MinIO via published ports.
 
 ---
 
-## 8. Next ↔ Python contract
+## 7. Next ↔ Python contract
 
-- **Enqueue:** on video upload, Next inserts the `jobs` row + sets `video.status=processing`,
-  then `POST {AI_SERVICE_URL}/jobs` with `{ jobId, type, videoId, orgId }` and
-  `Authorization: Bearer AI_SERVICE_TOKEN`. Non-blocking; failure leaves the job `queued`
-  for a reconcile sweep.
-- **Status:** the video page reads `video.status`; a light client poll (or revalidate)
-  flips from "Processing…" to the player when `ready`.
-- **Idempotency/retries:** `jobs.attempts`; a worker re-run overwrites outputs.
-
----
-
-## 9. Environment (new)
-
-| Var | Where | Purpose |
-|---|---|---|
-| `AI_SERVICE_URL` | Next | FastAPI base URL |
-| `AI_SERVICE_TOKEN` | Next + AI | shared bearer token |
-| `DATABASE_URL` | AI | shared Postgres |
-| `REDIS_URL` | AI | RQ broker (shared) |
-| `STORAGE_DIR` | AI | same storage root as Next |
-| `WHISPER_MODEL` | AI | 2d (e.g. `base`/`small`) |
+- **Enqueue:** on upload, Next PUTs the original to MinIO, inserts `jobs` (`queued`),
+  sets `video.status='processing'`, then `POST {AI_SERVICE_URL}/jobs {jobId}` (Bearer).
+  Failure to reach the API leaves the job `queued` for a reconcile sweep.
+- **Process:** FastAPI enqueues the Celery task; the worker claims it, runs ffmpeg, writes
+  outputs + `videos` keys + `jobs.status`. Retries with backoff; max attempts → DLQ +
+  `failed`.
+- **Status:** the video page reads `video.status`; a light client poll flips
+  "Processing…" → player on `ready`.
 
 ---
 
-## 10. Phased implementation
+## 8. Environment
 
-- **2a — Foundations + transcode:** `jobs` table + `videos` columns; `apps/ai` scaffold
-  (FastAPI + RQ + ffmpeg); enqueue on upload; probe duration + MP4 + poster; UI
-  processing/ready/failed states; play MP4. *(commit)*
-- **2b — HLS + adaptive playback:** renditions + master manifest; Next HLS serving route;
-  Vidstack HLS; CSP `worker-src blob:`. *(commit)*
-- **2c — Scrub thumbnails:** sprite + WebVTT. *(commit)*
-- **2d — Transcription:** faster-whisper → captions + transcript + chapters; wire Vidstack
-  captions + the Transcript/Chapters panels from `docs/Video.png`. *(commit)*
-- **2e — (later)** feed transcripts into Phase-2 AI search/RAG (separate track).
-
-Retire the client-side poster stopgap — the worker generates posters/duration reliably.
+**Next:** `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_REGION`,
+`AI_SERVICE_URL`, `AI_SERVICE_TOKEN` (+ existing).
+**AI:** `DATABASE_URL`, `RABBITMQ_URL`, `S3_ENDPOINT/KEY/SECRET/BUCKET/REGION`,
+`AI_SERVICE_TOKEN`, `WHISPER_MODEL` (2d).
 
 ---
 
-## 11. Prerequisites (dev)
+## 9. Reliability & observability
 
-- **Python 3.11+** and **ffmpeg/ffprobe** on PATH (Windows: download the ffmpeg build).
-- Redis running (already have it).
-- `AI_SERVICE_TOKEN` generated; `AI_SERVICE_URL=http://127.0.0.1:8000`.
+Idempotent tasks (re-run overwrites outputs), retries + exponential backoff, dead-letter
+queue, per-job timeout, temp cleanup, structured logs with a correlation id from Next,
+Flower dashboard, health checks, graceful failure → `video.status='failed'` + admin retry.
 
-## 12. Known limitations / production notes
+---
 
-- Local-FS HLS works single-server; multi-instance/CDN needs object storage (storage
-  module already abstracts this).
-- Whisper on CPU is slow; a GPU or a smaller model is recommended for volume.
-- Transcode is CPU-heavy — size the worker(s) accordingly; long videos take minutes.
+## 10. Phased plan
+
+- **2a — Foundations + transcode:** compose (RabbitMQ+MinIO), `apps/ai` (FastAPI+Celery+
+  ffmpeg), `jobs` table + `videos` columns, Next storage→S3 + enqueue-on-upload, MP4 +
+  poster + duration, processing/ready/failed UI, presigned playback of MP4.
+- **2b — Adaptive HLS:** CMAF ladder + master manifest; Vidstack HLS; `worker-src blob:` CSP.
+- **2c — Scrub sprites.**
+- **2d — Transcription:** faster-whisper → captions + transcript + chapters (wires the
+  Video.png Transcript/Chapters panels).
+- **2e — (later)** transcripts → AI search/RAG.
+
+---
+
+## 11. Prerequisites
+
+Docker Desktop (or Podman/Rancher/WSL2). ffmpeg lives in the worker image (host ffmpeg no
+longer required). `AI_SERVICE_TOKEN` generated. All components are free/OSS; MinIO is
+self-hosted (no AWS account, no cloud fees).
+
+## 12. Production notes
+
+Multi-instance/CDN: put a CDN in front of MinIO (or object storage) and issue signed URLs;
+Whisper wants a GPU or small model at volume; size worker concurrency to CPU. Docker
+Desktop licensing only matters for large orgs — Podman/Rancher/WSL2 keep it free.

@@ -21,9 +21,16 @@ const schema = z.object({
   SMTP_PASSWORD: z.string().min(1),
   EMAIL_FROM: z.string().min(1),
 
-  // Local file storage root (resolved from the app cwd). Swap the storage
-  // module for object storage in production without touching callers.
-  STORAGE_DIR: z.string().default("./.storage"),
+  // Object storage (MinIO / S3-compatible).
+  S3_ENDPOINT: z.string().url(),
+  S3_ACCESS_KEY: z.string().min(1),
+  S3_SECRET_KEY: z.string().min(1),
+  S3_BUCKET: z.string().min(1),
+  S3_REGION: z.string().default("us-east-1"),
+
+  // Media/AI processing service (apps/ai).
+  AI_SERVICE_URL: z.string().url(),
+  AI_SERVICE_TOKEN: z.string().min(1),
 
   SEED_ADMIN_EMAIL: z.string().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),
