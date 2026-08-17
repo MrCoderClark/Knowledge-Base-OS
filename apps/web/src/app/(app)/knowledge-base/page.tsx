@@ -11,7 +11,12 @@ import {
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getActor } from "@/server/authz";
-import { browseDocuments, categoryCounts, type BrowseItem } from "@/server/kb/browse";
+import {
+  browseDocuments,
+  browseVideos,
+  categoryCounts,
+  type BrowseItem,
+} from "@/server/kb/browse";
 
 type Search = {
   type?: string;
@@ -36,12 +41,17 @@ function initials(name: string | null): string {
 }
 
 function typeMeta(item: BrowseItem): { label: string; Icon: typeof FileText } {
+  if (item.kind === "video") return { label: "Video", Icon: Film };
   if (item.docType === "uploaded") {
     if (item.mimeType?.startsWith("image/")) return { label: "Image", Icon: ImageIcon };
     if (item.mimeType === "application/pdf") return { label: "PDF", Icon: FileText };
     return { label: "File", Icon: FileText };
   }
   return { label: "Doc", Icon: FileText };
+}
+
+function itemHref(item: BrowseItem): string {
+  return item.kind === "video" ? `/videos/${item.id}` : `/documents/${item.id}`;
 }
 
 function Pill({
@@ -107,17 +117,25 @@ export default async function KnowledgeBasePage({
   const sp = await searchParams;
   const type = sp.type ?? "all";
   const view = sp.view === "list" ? "list" : "grid";
-  const showDocs = type === "all" || type === "documents";
+  const pdfOnly = sp.content === "pdf";
 
-  const [items, cats] = await Promise.all([
-    showDocs
-      ? browseDocuments(actor.orgId, {
-          categorySlug: sp.category,
-          pdfOnly: sp.content === "pdf",
-        })
-      : Promise.resolve([]),
+  const wantsDocs = type === "all" || type === "documents";
+  // The PDF content-type filter is document-specific, so it excludes videos.
+  const wantsVideos = (type === "all" || type === "videos") && !pdfOnly;
+
+  const [docs, vids, cats] = await Promise.all([
+    wantsDocs
+      ? browseDocuments(actor.orgId, { categorySlug: sp.category, pdfOnly })
+      : Promise.resolve([] as BrowseItem[]),
+    wantsVideos
+      ? browseVideos(actor.orgId, { categorySlug: sp.category })
+      : Promise.resolve([] as BrowseItem[]),
     categoryCounts(actor.orgId),
   ]);
+
+  const items = [...docs, ...vids].sort(
+    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+  );
 
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
@@ -231,11 +249,9 @@ export default async function KnowledgeBasePage({
         <div className="min-w-0 flex-1">
           {items.length === 0 ? (
             <div className="rounded-xl border border-border bg-surface px-6 py-16 text-center text-sm text-body">
-              {type === "videos"
-                ? "Videos are coming soon."
-                : type === "collections"
-                  ? "Collections are coming soon."
-                  : "No published documents match these filters yet."}
+              {type === "collections"
+                ? "Collections are coming soon."
+                : "Nothing matches these filters yet."}
             </div>
           ) : view === "grid" ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -244,7 +260,7 @@ export default async function KnowledgeBasePage({
                 return (
                   <Link
                     key={item.id}
-                    href={`/documents/${item.id}`}
+                    href={itemHref(item)}
                     className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-border-strong"
                   >
                     <div className="relative flex h-32 items-center justify-center bg-gradient-to-br from-indigo-soft to-nav-active">
@@ -283,7 +299,7 @@ export default async function KnowledgeBasePage({
                 return (
                   <li key={item.id}>
                     <Link
-                      href={`/documents/${item.id}`}
+                      href={itemHref(item)}
                       className="flex items-center gap-4 px-5 py-3 hover:bg-nav-active"
                     >
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-soft text-indigo">

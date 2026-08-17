@@ -1,8 +1,9 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
-import { categories, documents, users } from "@/server/db/schema";
+import { categories, documents, users, videos } from "@/server/db/schema";
 
 export type BrowseItem = {
+  kind: "document" | "video";
   id: string;
   title: string;
   docType: string;
@@ -52,6 +53,7 @@ export async function browseDocuments(
     .orderBy(desc(documents.updatedAt));
 
   return rows.map((r) => ({
+    kind: "document" as const,
     id: r.id,
     title: r.title,
     docType: r.docType,
@@ -65,6 +67,45 @@ export async function browseDocuments(
       r.docType === "uploaded"
         ? (r.mimeType ?? "File")
         : excerptFromHtml(r.bodyHtml),
+  }));
+}
+
+export async function browseVideos(
+  orgId: string,
+  opts: { categorySlug?: string } = {},
+): Promise<BrowseItem[]> {
+  const conds = [eq(videos.orgId, orgId), eq(videos.status, "ready")];
+  if (opts.categorySlug) conds.push(eq(categories.slug, opts.categorySlug));
+
+  const rows = await db
+    .select({
+      id: videos.id,
+      title: videos.title,
+      mimeType: videos.mimeType,
+      categoryName: categories.name,
+      categoryColor: categories.color,
+      authorName: users.name,
+      authorImage: users.image,
+      updatedAt: videos.updatedAt,
+    })
+    .from(videos)
+    .leftJoin(categories, eq(videos.categoryId, categories.id))
+    .leftJoin(users, eq(videos.createdBy, users.id))
+    .where(and(...conds))
+    .orderBy(desc(videos.updatedAt));
+
+  return rows.map((r) => ({
+    kind: "video" as const,
+    id: r.id,
+    title: r.title,
+    docType: "video",
+    mimeType: r.mimeType,
+    categoryName: r.categoryName,
+    categoryColor: r.categoryColor,
+    authorName: r.authorName,
+    authorImage: r.authorImage,
+    updatedAt: r.updatedAt,
+    excerpt: "Video recording",
   }));
 }
 

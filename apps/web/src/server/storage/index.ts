@@ -1,4 +1,4 @@
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { env } from "@/server/env";
 
@@ -26,6 +26,28 @@ export async function putFile(key: string, data: Buffer): Promise<void> {
 
 export function readFileBuffer(key: string): Promise<Buffer> {
   return readFile(resolveKey(key));
+}
+
+export async function fileSize(key: string): Promise<number> {
+  const s = await stat(resolveKey(key));
+  return s.size;
+}
+
+/** Read a byte range [start, end] inclusive — used for HTTP Range responses. */
+export async function readFileRange(
+  key: string,
+  start: number,
+  end: number,
+): Promise<Buffer> {
+  const length = end - start + 1;
+  const fh = await open(resolveKey(key), "r");
+  try {
+    const buf = Buffer.alloc(length);
+    await fh.read(buf, 0, length, start);
+    return buf;
+  } finally {
+    await fh.close();
+  }
 }
 
 export async function deleteFile(key: string): Promise<void> {

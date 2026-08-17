@@ -206,6 +206,49 @@ export const documentVersions = pgTable(
   (t) => [unique().on(t.documentId, t.version)],
 );
 
+export const videoStatus = pgEnum("video_status", [
+  "uploaded",
+  "processing",
+  "ready",
+  "failed",
+]);
+
+export const videos = pgTable(
+  "videos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+    categoryId: uuid("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    fileKey: text("file_key").notNull(),
+    mimeType: text("mime_type"),
+    sizeBytes: bigint("size_bytes", { mode: "number" }),
+    // Phase 2: transcode output, poster frame, transcript.
+    posterKey: text("poster_key"),
+    durationSeconds: integer("duration_seconds"),
+    transcript: text("transcript"),
+    status: videoStatus("status").notNull().default("ready"),
+    createdBy: text("created_by").references(() => users.id),
+    updatedBy: text("updated_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    unique().on(t.orgId, t.slug),
+    index("videos_org_created_idx").on(t.orgId, t.createdAt),
+  ],
+);
+
 /* ------------------------------------------------------------------ */
 /* Auth: server-side sessions (see docs/specs/07-auth-security.md)     */
 /* Only an HMAC hash of the token is stored — never the raw token.     */

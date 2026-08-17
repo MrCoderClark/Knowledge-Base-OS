@@ -36,6 +36,20 @@
       "when": 1786734879163,
       "tag": "0004_certain_dexter_bennett",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786738545362,
+      "tag": "0005_lethal_silver_sable",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786740221315,
+      "tag": "0006_complex_dazzler",
+      "breakpoints": true
     }
   ]
 }
