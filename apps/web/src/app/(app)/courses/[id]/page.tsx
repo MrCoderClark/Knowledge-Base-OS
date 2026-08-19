@@ -3,10 +3,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getActor, hasPermission } from "@/server/authz";
 import { completedLessonIds, getCourse, getCourseLessons } from "@/server/kb/courses";
+import { ensureEnrollment } from "@/server/kb/enrollments";
+import { getVideoProgressMap } from "@/server/kb/progress";
 import { getVideo } from "@/server/kb/videos";
-import { PlayerProvider } from "../../videos/player-context";
-import { VideoPlayer } from "../../videos/VideoPlayer";
-import { LessonComplete } from "../LessonComplete";
+import { LessonPlayer } from "../LessonPlayer";
 
 export default async function CourseViewPage({
   params,
@@ -27,6 +27,16 @@ export default async function CourseViewPage({
 
   const lessons = await getCourseLessons(id);
   const completed = new Set(await completedLessonIds(actor.userId, id));
+  const progress = await getVideoProgressMap(
+    actor.userId,
+    lessons.map((l) => l.itemId),
+  );
+
+  // Enroll real learners the first time they open a published course.
+  if (course.status === "published") {
+    await ensureEnrollment(actor.orgId, course.id, actor.userId);
+  }
+
   const pct =
     lessons.length > 0
       ? Math.round((completed.size / lessons.length) * 100)
@@ -83,59 +93,60 @@ export default async function CourseViewPage({
       : (lessons.find((l) => !completed.has(l.id))?.id ?? lessons[0].id);
   const currentIndex = lessons.findIndex((l) => l.id === currentId);
   const current = lessons[currentIndex];
-  const nextLessonId = lessons[currentIndex + 1]?.id ?? null;
+  const nextLesson = lessons[currentIndex + 1] ?? null;
   const video = await getVideo(actor.orgId, current.itemId);
+
+  const player =
+    video && video.status === "ready"
+      ? {
+          src: video.hlsKey
+            ? `/api/videos/${video.id}/hls/master.m3u8`
+            : `/api/videos/${video.id}/file`,
+          type: video.hlsKey
+            ? "application/vnd.apple.mpegurl"
+            : "video/mp4",
+          title: current.videoTitle ?? "Lesson",
+          videoId: video.id,
+          captions: video.captionsKey
+            ? `/api/videos/${video.id}/captions`
+            : undefined,
+          thumbnails: video.spriteKey
+            ? `/api/videos/${video.id}/sprite/sprite.vtt`
+            : undefined,
+          resumeAt: completed.has(current.id)
+            ? 0
+            : progress.get(current.itemId)?.lastPositionSeconds,
+        }
+      : null;
 
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
       {header}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <PlayerProvider>
-            {video && video.status === "ready" ? (
-              <VideoPlayer
-                src={
-                  video.hlsKey
-                    ? `/api/videos/${video.id}/hls/master.m3u8`
-                    : `/api/videos/${video.id}/file`
-                }
-                type={
-                  video.hlsKey ? "application/vnd.apple.mpegurl" : "video/mp4"
-                }
-                title={current.videoTitle ?? "Lesson"}
-                captions={
-                  video.captionsKey
-                    ? `/api/videos/${video.id}/captions`
-                    : undefined
-                }
-                thumbnails={
-                  video.spriteKey
-                    ? `/api/videos/${video.id}/sprite/sprite.vtt`
-                    : undefined
-                }
-              />
-            ) : (
-              <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-border bg-surface text-sm text-muted">
-                This lesson&apos;s video is still processing.
-              </div>
-            )}
-          </PlayerProvider>
+          <LessonPlayer
+            courseId={course.id}
+            lessonId={current.id}
+            nextLessonId={nextLesson?.id ?? null}
+            nextLessonTitle={
+              nextLesson
+                ? (nextLesson.overrideTitle ?? nextLesson.videoTitle ?? "Next lesson")
+                : null
+            }
+            player={player}
+            completed={completed.has(current.id)}
+          />
 
-          <div className="flex items-center justify-between rounded-xl border border-border bg-surface p-5">
-            <div>
-              <div className="text-xs uppercase tracking-wider text-muted">
-                Lesson {currentIndex + 1} of {lessons.length}
-              </div>
-              <div className="font-semibold text-heading">
-                {current.overrideTitle ?? current.videoTitle ?? "Lesson"}
-              </div>
+          <div className="rounded-xl border border-border bg-surface p-5">
+            <div className="text-xs uppercase tracking-wider text-muted">
+              Lesson {currentIndex + 1} of {lessons.length}
             </div>
-            <LessonComplete
-              courseId={course.id}
-              lessonId={current.id}
-              nextLessonId={nextLessonId}
-              completed={completed.has(current.id)}
-            />
+            <div className="font-semibold text-heading">
+              {current.overrideTitle ?? current.videoTitle ?? "Lesson"}
+            </div>
+            <p className="mt-1 text-sm text-muted">
+              This lesson completes automatically once you watch it to the end.
+            </p>
           </div>
         </div>
 
@@ -147,6 +158,9 @@ export default async function CourseViewPage({
             {lessons.map((l, i) => {
               const isCurrent = l.id === currentId;
               const isDone = completed.has(l.id);
+              const watchPct = isDone
+                ? 100
+                : (progress.get(l.itemId)?.progressPct ?? 0);
               return (
                 <li key={l.id}>
                   <Link
@@ -164,10 +178,25 @@ export default async function CourseViewPage({
                     >
                       {isDone ? <Check className="size-3" /> : i + 1}
                     </span>
-                    <span
-                      className={`truncate ${isCurrent ? "font-medium text-heading" : "text-body"}`}
-                    >
-                      {l.overrideTitle ?? l.videoTitle ?? "Lesson"}
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={`block truncate ${isCurrent ? "font-medium text-heading" : "text-body"}`}
+                      >
+                        {l.overrideTitle ?? l.videoTitle ?? "Lesson"}
+                      </span>
+                      {!isDone && watchPct > 0 && (
+                        <span className="mt-1 flex items-center gap-2">
+                          <span className="h-1 w-full overflow-hidden rounded-full bg-nav-active">
+                            <span
+                              className="block h-full rounded-full bg-indigo"
+                              style={{ width: `${watchPct}%` }}
+                            />
+                          </span>
+                          <span className="shrink-0 text-[10px] text-muted">
+                            {watchPct}%
+                          </span>
+                        </span>
+                      )}
                     </span>
                   </Link>
                 </li>

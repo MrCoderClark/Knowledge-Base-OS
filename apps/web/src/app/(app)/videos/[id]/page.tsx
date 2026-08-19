@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getActor, hasPermission } from "@/server/authz";
+import { getVideoProgress } from "@/server/kb/progress";
 import { getVideoWithMeta, relatedVideos } from "@/server/kb/videos";
 import { ChapterList } from "../ChapterList";
 import { PlayerProvider } from "../player-context";
@@ -51,6 +52,8 @@ export default async function VideoViewPage({
   if (!video) notFound();
 
   const related = await relatedVideos(actor.orgId, id);
+  const resume = await getVideoProgress(actor.userId, id);
+  const resumeAt = resume?.lastPositionSeconds ?? undefined;
   const duration = fmtDuration(video.durationSeconds);
   const chapters =
     (video.chapters as { start: number; title: string }[] | null) ?? [];
@@ -116,6 +119,8 @@ export default async function VideoViewPage({
                 src={`/api/videos/${video.id}/hls/master.m3u8`}
                 type="application/vnd.apple.mpegurl"
                 title={video.title}
+                videoId={video.id}
+                resumeAt={resumeAt}
                 thumbnails={
                   video.spriteKey
                     ? `/api/videos/${video.id}/sprite/sprite.vtt`
@@ -132,6 +137,8 @@ export default async function VideoViewPage({
                 src={`/api/videos/${video.id}/file`}
                 type="video/mp4"
                 title={video.title}
+                videoId={video.id}
+                resumeAt={resumeAt}
                 thumbnails={
                   video.spriteKey
                     ? `/api/videos/${video.id}/sprite/sprite.vtt`

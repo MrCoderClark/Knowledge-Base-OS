@@ -3,10 +3,12 @@
 Living tracker of what's **done**, **outstanding**, and **next**. Update this at the end
 of each phase/slice. Plan + specs: [`PLAN.md`](./PLAN.md) · [`specs/`](./specs).
 
-_Last updated: 2026-08-19 (Training slice A built on branch `phase-1-training`)._
+_Last updated: 2026-08-19 (Training slice A merged; **LMS Wave 1** built on branch
+`phase-1-training-b`)._
 
-**Current branch:** `phase-1-training` (unmerged). **Working on:** Training/LMS.
-**Do next:** finish Training slice B (below).
+**Current branch:** `phase-1-training-b` (unmerged). **Working on:** Training/LMS →
+enterprise LMS roadmap (5 waves). **Do next:** verify + commit **Wave 1**
+(watch-to-complete + resume), then Wave 2 (enrollment/assignment/My Learning).
 
 ---
 
@@ -18,7 +20,7 @@ _Last updated: 2026-08-19 (Training slice A built on branch `phase-1-training`).
 | Phase 1a — Auth (production) | ✅ merged to `main` |
 | Phase 1 — Core KB | 🟡 partial (Categories, Documents, Videos, Browse done) |
 | Phase 2 — Video pipeline | ✅ merged to `main` (2a→2d-ii) |
-| **Training / LMS** | 🚧 in progress — **slice A done** on `phase-1-training` |
+| **Training / LMS** | 🚧 in progress — slice A merged; **Wave 1 built** on `phase-1-training-b` |
 | Phase 2 — AI (2e) | ⬜ not started |
 | Phase 3 — Enterprise hardening | ⬜ not started |
 
@@ -68,19 +70,40 @@ course-based (not standalone videos). Leverages the per-video **transcripts** fr
 - Key files: `server/kb/courses.ts`, `server/kb/course-actions.ts`, `app/(app)/courses/*`.
 - Note: viewer imports player from `../../videos/` (VideoPlayer, player-context).
 
-**Slice B — NEXT:**
-- [ ] **Enrollment** (self-enroll / assign) + auto-complete enrollment when all lessons done.
-- [ ] **Auto-complete lesson on watch** (~90% via player time) instead of only the manual button.
-- [ ] **Continue Learning** = in-progress *courses* (progress service exists: `server/kb/progress.ts` was started but **not written** — recreate it: `upsertVideoProgress`, `getVideoProgress`, `continueLearning`). Resume to last position.
-- [ ] **Dashboard real data** — KPIs, Recently Added, Recent Activity, Continue Learning (currently mock in `app/(app)/page.tsx`).
-- [ ] **AI-assisted (uses Python service + Claude + transcripts):**
-  - [ ] Generate a course **outline** from a topic (title/description/lesson list → prefills builder).
-  - [ ] Suggest **which existing videos** fit a course (transcript match).
-  - [ ] **Content-gap ideas** — suggested new video topics.
-  - [ ] Later: quiz generation, lesson summaries, auto-descriptions.
-  - Needs `ANTHROPIC_API_KEY` in `apps/ai`.
+### Enterprise LMS roadmap (decided 2026-08-19) — 5 waves, branch/commit each
 
-**Build order:** Courses/Lessons foundation → progress/Continue-Learning → AI assist.
+Full plan: watch-to-complete, resume, enrollment/assignment, compliance & certificates,
+analytics, quizzes, Trailhead-style badges, notes, notifications. Ships wave by wave.
+
+**Wave 1 — Watch-to-complete + Resume — BUILT (verify + commit on `phase-1-training-b`):**
+- [x] **Progress service** `server/kb/progress.ts` — `upsertVideoProgress` (pct = max-ever),
+  `getVideoProgress`, `getVideoProgressMap`, `continueLearning`. Enrollment helpers in
+  `server/kb/enrollments.ts` (`ensureEnrollment`, `completeEnrollmentIfDone`, …).
+- [x] **Progress API** `POST /api/videos/[id]/progress` (auth + org-scoped).
+- [x] **Player wiring** (`videos/VideoPlayer.tsx`) — resume seek, throttled save (~10s) +
+  `sendBeacon` on tab-hide, auto-complete at **≥95% / `ended`**. Resume added to standalone
+  video page too.
+- [x] **Manual button removed** — new `courses/LessonPlayer.tsx` (auto-complete + "Up next"
+  autoplay countdown); course viewer shows **per-lesson %** + resume markers; auto-enroll on
+  open; enrollment auto-completes when all lessons done.
+- [x] **Dashboard Continue Learning** = real in-progress courses (`app/(app)/page.tsx`).
+- No migration (tables already existed). Other dashboard KPIs/Recently-Added/Activity still mock.
+
+**Wave 2 — Enrollment, Assignment, My Learning** · migration (enrollments +cols, notifications):
+self-enroll + admin/team **assign** + **due dates/overdue**, in-app **notifications**,
+**/my-learning** hub, course **overview page**.
+
+**Wave 3 — Compliance, Certificates, Analytics, Anti-skip** · migration: **certificates** +
+verify page, **required-training + compliance dashboard**, **admin analytics + CSV export**,
+**anti-skip** enforcement.
+
+**Wave 4 — Quizzes & pass-gating** · migration: quiz authoring/taking + gating.
+
+**Wave 5 — Gamification, Notes, Email** · migration: **Trailhead-style badges + points**,
+**timestamped notes**, **email reminders** (existing sender).
+
+**AI-assisted (was slice C; now folds into a later wave / Phase 2e):** course-outline
+generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API_KEY` in `apps/ai`.
 
 ---
 

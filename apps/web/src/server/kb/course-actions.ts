@@ -15,6 +15,7 @@ import {
   setCourseStatus,
   updateCourse,
 } from "./courses";
+import { completeEnrollmentIfDone, ensureEnrollment } from "./enrollments";
 import type { CourseFormState } from "./kb-types";
 
 const courseSchema = z.object({
@@ -120,13 +121,30 @@ export async function reorderLessonsAction(
   revalidatePath(`/courses/${courseId}/edit`);
 }
 
-/** Learner action — mark a lesson complete for the current user. */
+/**
+ * Learner action — mark a lesson complete for the current user. Called by the
+ * player when a lesson is watched to the end (≥95%). Ensures the learner is
+ * enrolled and flips the enrollment to `completed` once every lesson is done.
+ */
 export async function completeLessonAction(
   courseId: string,
   lessonId: string,
 ): Promise<void> {
   const actor = await getActor();
   if (!actor) return;
+  await ensureEnrollment(actor.orgId, courseId, actor.userId);
   await markLessonComplete(actor.userId, lessonId);
+  await completeEnrollmentIfDone(courseId, actor.userId);
+  revalidatePath(`/courses/${courseId}`);
+  revalidatePath("/");
+}
+
+/** Learner action — self-enroll in a course (idempotent). */
+export async function enrollAction(courseId: string): Promise<void> {
+  const actor = await getActor();
+  if (!actor) return;
+  const course = await getCourse(actor.orgId, courseId);
+  if (!course) return;
+  await ensureEnrollment(actor.orgId, courseId, actor.userId);
   revalidatePath(`/courses/${courseId}`);
 }
