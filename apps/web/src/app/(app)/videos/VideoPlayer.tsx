@@ -10,6 +10,7 @@ import {
   type MediaPlayerInstance,
   MediaProvider,
   type MediaProviderAdapter,
+  type TextTrackListModeChangeEvent,
   Track,
 } from "@vidstack/react";
 import {
@@ -32,6 +33,8 @@ type Props = {
   videoId?: string;
   /** Seconds to resume from (0/undefined starts at the beginning). */
   resumeAt?: number;
+  /** Start playback automatically (used for course lessons). */
+  autoPlay?: boolean;
   /** Fired once when the video is watched to the end (≥95% or `ended`). */
   onComplete?: () => void;
 };
@@ -47,6 +50,7 @@ export function VideoPlayer({
   captions,
   videoId,
   resumeAt,
+  autoPlay,
   onComplete,
 }: Props) {
   const controls = usePlayerControls();
@@ -68,6 +72,7 @@ export function VideoPlayer({
   // Position we resumed to; used to avoid re-saving an unmoved spot.
   const resumedPos = useRef<number | null>(null);
   const unsub = useRef<(() => void) | null>(null);
+  const capUnsub = useRef<(() => void) | null>(null);
 
   const save = useCallback((useBeacon = false, force = false) => {
     const id = cfg.current.videoId;
@@ -105,7 +110,25 @@ export function VideoPlayer({
       controls?.register(player);
       unsub.current?.();
       unsub.current = null;
+      capUnsub.current?.();
+      capUnsub.current = null;
       if (!player || typeof player.subscribe !== "function") return;
+
+      // Captions must start OFF. Vidstack remembers the last caption choice and
+      // restores it on load via a *programmatic* mode change (no `trigger`); a
+      // user clicking the CC button carries a trigger event, which we leave
+      // alone. So we only undo the restored/auto enables.
+      const tracks = player.textTracks;
+      const onModeChange = (e: TextTrackListModeChangeEvent) => {
+        if (e.detail.mode === "showing" && e.trigger == null) {
+          e.detail.setMode("disabled");
+        }
+      };
+      tracks.addEventListener("mode-change", onModeChange);
+      const already = tracks.selected;
+      if (already && already.mode === "showing") already.mode = "disabled";
+      capUnsub.current = () =>
+        tracks.removeEventListener("mode-change", onModeChange);
 
       unsub.current = player.subscribe((state) => {
         const duration = state.duration;
@@ -179,18 +202,13 @@ export function VideoPlayer({
       title={title}
       src={{ src, type: type as "video/mp4" }}
       playsInline
+      autoplay={autoPlay}
       onProviderChange={onProviderChange}
       className="aspect-video w-full overflow-hidden rounded-xl border border-border"
     >
       <MediaProvider />
       {captions && (
-        <Track
-          kind="subtitles"
-          src={captions}
-          label="English"
-          language="en"
-          default
-        />
+        <Track kind="subtitles" src={captions} label="English" language="en" />
       )}
       <DefaultVideoLayout thumbnails={thumbnails} icons={defaultLayoutIcons} />
     </MediaPlayer>

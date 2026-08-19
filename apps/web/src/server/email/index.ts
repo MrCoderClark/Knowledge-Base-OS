@@ -53,6 +53,33 @@ export async function sendInviteEmail(params: {
   });
 }
 
+export async function sendCourseAssignedEmail(params: {
+  to: string;
+  name?: string | null;
+  courseTitle: string;
+  url: string;
+  dueAt?: Date | null;
+}): Promise<void> {
+  const greeting = params.name ? `Hi ${params.name},` : "Hi,";
+  const due = params.dueAt
+    ? ` It's due by ${params.dueAt.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })}.`
+    : "";
+  await sendMail({
+    to: params.to,
+    subject: `New training assigned: ${params.courseTitle}`,
+    text: `${greeting}\n\nYou've been assigned the course "${params.courseTitle}".${due}\n\nStart it here:\n${params.url}`,
+    html: layout(
+      "New training assigned",
+      `<p style="margin:0 0 16px;font-size:14px;">${greeting} you've been assigned the course <strong>${params.courseTitle}</strong>.${due}</p>
+       <p style="margin:0 0 20px;">${button(params.url, "Start course")}</p>`,
+    ),
+  });
+}
+
 export async function sendPasswordResetEmail(params: {
   to: string;
   name?: string | null;

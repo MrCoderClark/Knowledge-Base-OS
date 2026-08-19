@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { learningProgress } from "@/server/db/schema";
 import { completedLessonIds, getCourseLessons } from "./courses";
-import { listEnrolledCourses } from "./enrollments";
+import { listEnrollmentsWithCourse } from "./enrollments";
 
 export type VideoProgress = {
   lastPositionSeconds: number;
@@ -105,6 +105,84 @@ export async function getVideoProgressMap(
   return map;
 }
 
+export type MyCourseCard = {
+  courseId: string;
+  title: string;
+  status: "enrolled" | "completed";
+  /** True when an admin assigned this (vs. self-enrolled). */
+  assigned: boolean;
+  dueAt: Date | null;
+  /** Blended progress: completed lessons + partial watch credit. */
+  coursePct: number;
+  /** True once any lesson has been watched (even partially) or completed. */
+  started: boolean;
+  doneLessons: number;
+  totalLessons: number;
+  resumeLessonId: string | null;
+  /** Title of the next lesson to resume (null when finished/empty). */
+  nextLessonTitle: string | null;
+  lastActivity: Date;
+};
+
+/**
+ * Every course a learner is enrolled in, with computed progress + the next
+ * lesson to resume. Powers the "My Learning" hub and Continue-Learning rail.
+ * Progress is blended: completed lessons count fully, partially-watched ones
+ * get proportional credit, so a course reads as "in progress" the moment a
+ * learner starts watching — before any single lesson is finished.
+ */
+export async function myCourses(
+  orgId: string,
+  userId: string,
+): Promise<MyCourseCard[]> {
+  const rows = await listEnrollmentsWithCourse(orgId, userId);
+
+  const cards: MyCourseCard[] = [];
+  for (const e of rows) {
+    const lessons = await getCourseLessons(e.courseId);
+    const total = lessons.length;
+    const completed = new Set(await completedLessonIds(userId, e.courseId));
+    const done = lessons.filter((l) => completed.has(l.id)).length;
+    const progress = await getVideoProgressMap(
+      userId,
+      lessons.map((l) => l.itemId),
+    );
+
+    let fractionSum = 0;
+    let anyWatched = false;
+    for (const l of lessons) {
+      if (completed.has(l.id)) {
+        fractionSum += 1;
+        continue;
+      }
+      const pct = progress.get(l.itemId)?.progressPct ?? 0;
+      if (pct > 0) anyWatched = true;
+      fractionSum += pct / 100;
+    }
+
+    const next = lessons.find((l) => !completed.has(l.id)) ?? null;
+    const prog = next?.itemId != null ? progress.get(next.itemId) : undefined;
+
+    cards.push({
+      courseId: e.courseId,
+      title: e.title,
+      status: e.status,
+      assigned: e.assignedBy != null,
+      dueAt: e.dueAt,
+      coursePct: total > 0 ? Math.round((fractionSum / total) * 100) : 0,
+      started: done > 0 || anyWatched,
+      doneLessons: done,
+      totalLessons: total,
+      resumeLessonId: next?.id ?? lessons[0]?.id ?? null,
+      nextLessonTitle: next
+        ? (next.overrideTitle ?? next.videoTitle ?? "Lesson")
+        : null,
+      lastActivity: prog?.updatedAt ?? e.completedAt ?? e.enrolledAt,
+    });
+  }
+  return cards;
+}
+
 export type ContinueLearningCard = {
   courseId: string;
   title: string;
@@ -117,41 +195,30 @@ export type ContinueLearningCard = {
 
 /**
  * In-progress *courses* for the dashboard "Continue Learning" rail: enrolled
- * (not yet completed) courses, each pointing at the next incomplete lesson,
- * ordered by most-recent activity.
+ * (not yet completed) courses with at least one lesson remaining, ordered by
+ * most-recent activity.
  */
 export async function continueLearning(
   orgId: string,
   userId: string,
 ): Promise<ContinueLearningCard[]> {
-  const enrolled = await listEnrolledCourses(orgId, userId);
-
-  const cards: ContinueLearningCard[] = [];
-  for (const course of enrolled) {
-    const lessons = await getCourseLessons(course.id);
-    if (lessons.length === 0) continue;
-
-    const completed = new Set(await completedLessonIds(userId, course.id));
-    const doneCount = lessons.filter((l) => completed.has(l.id)).length;
-    if (doneCount === lessons.length) continue; // finished — not "continue"
-
-    const next =
-      lessons.find((l) => !completed.has(l.id)) ?? lessons[lessons.length - 1];
-    const prog = next.itemId
-      ? await getVideoProgress(userId, next.itemId)
-      : null;
-
-    cards.push({
-      courseId: course.id,
-      title: course.title,
-      subtitle: next.overrideTitle ?? next.videoTitle ?? "Lesson",
-      coursePct: Math.round((doneCount / lessons.length) * 100),
-      resumeLessonId: next.id,
-      lastActivity: prog?.updatedAt ?? course.enrolledAt,
-    });
-  }
-
-  return cards.sort(
-    (a, b) => b.lastActivity.getTime() - a.lastActivity.getTime(),
-  );
+  const cards = await myCourses(orgId, userId);
+  return cards
+    .filter(
+      (c) =>
+        c.status === "enrolled" &&
+        c.started &&
+        c.totalLessons > 0 &&
+        c.coursePct < 100 &&
+        c.resumeLessonId != null,
+    )
+    .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())
+    .map((c) => ({
+      courseId: c.courseId,
+      title: c.title,
+      subtitle: c.nextLessonTitle ?? "Lesson",
+      coursePct: c.coursePct,
+      resumeLessonId: c.resumeLessonId as string,
+      lastActivity: c.lastActivity,
+    }));
 }

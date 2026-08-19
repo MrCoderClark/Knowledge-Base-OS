@@ -15,8 +15,17 @@ import {
   setCourseStatus,
   updateCourse,
 } from "./courses";
-import { completeEnrollmentIfDone, ensureEnrollment } from "./enrollments";
+import { env } from "@/server/env";
+import { sendCourseAssignedEmail } from "@/server/email";
+import {
+  assignCourse,
+  completeEnrollmentIfDone,
+  ensureEnrollment,
+  teamMemberIds,
+} from "./enrollments";
 import type { CourseFormState } from "./kb-types";
+import { listOrgMembers } from "./members";
+import { createNotification, notifyMany } from "./notifications";
 
 const courseSchema = z.object({
   id: z.string().uuid().optional(),
@@ -134,9 +143,97 @@ export async function completeLessonAction(
   if (!actor) return;
   await ensureEnrollment(actor.orgId, courseId, actor.userId);
   await markLessonComplete(actor.userId, lessonId);
-  await completeEnrollmentIfDone(courseId, actor.userId);
+  const justFinished = await completeEnrollmentIfDone(courseId, actor.userId);
+  if (justFinished) {
+    const course = await getCourse(actor.orgId, courseId);
+    await createNotification({
+      orgId: actor.orgId,
+      userId: actor.userId,
+      type: "course_completed",
+      title: `Course complete: ${course?.title ?? "Course"}`,
+      body: "You've finished every lesson. 🎉",
+      linkUrl: `/courses/${courseId}`,
+    });
+  }
   revalidatePath(`/courses/${courseId}`);
   revalidatePath("/");
+  revalidatePath("/my-learning");
+}
+
+/** Admin action — assign a course to users and/or a whole team. */
+export async function assignCourseAction(input: {
+  courseId: string;
+  userIds: string[];
+  teamId: string | null;
+  dueAt: string | null;
+}): Promise<{ ok?: number; error?: string }> {
+  let actor;
+  try {
+    actor = await requirePermission("course:manage");
+  } catch {
+    return { error: "You don't have permission to assign courses." };
+  }
+
+  const course = await getCourse(actor.orgId, input.courseId);
+  if (!course) return { error: "Course not found." };
+
+  let userIds = [...input.userIds];
+  if (input.teamId) {
+    userIds = userIds.concat(await teamMemberIds(input.teamId));
+  }
+  userIds = [...new Set(userIds)];
+  if (userIds.length === 0) {
+    return { error: "Select at least one person or a team." };
+  }
+
+  const dueAt = input.dueAt ? new Date(input.dueAt) : null;
+  const assigned = await assignCourse({
+    orgId: actor.orgId,
+    courseId: input.courseId,
+    userIds,
+    assignedBy: actor.userId,
+    dueAt,
+    teamId: input.teamId,
+  });
+
+  const link = `/courses/${input.courseId}`;
+  const dueBody = dueAt
+    ? `Due ${dueAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+    : null;
+  await notifyMany(
+    assigned.map((userId) => ({
+      orgId: actor.orgId,
+      userId,
+      type: "course_assigned" as const,
+      title: `New training assigned: ${course.title}`,
+      body: dueBody,
+      linkUrl: link,
+    })),
+  );
+
+  // Email is best-effort — a mail failure must not fail the assignment.
+  try {
+    const members = await listOrgMembers(actor.orgId);
+    const byId = new Map(members.map((m) => [m.userId, m]));
+    await Promise.all(
+      assigned.map((userId) => {
+        const m = byId.get(userId);
+        if (!m) return Promise.resolve();
+        return sendCourseAssignedEmail({
+          to: m.email,
+          name: m.name,
+          courseTitle: course.title,
+          url: `${env.APP_URL}${link}`,
+          dueAt,
+        });
+      }),
+    );
+  } catch {
+    // swallow — notifications already delivered in-app
+  }
+
+  revalidatePath("/my-learning");
+  return { ok: assigned.length };
 }
 
 /** Learner action — self-enroll in a course (idempotent). */

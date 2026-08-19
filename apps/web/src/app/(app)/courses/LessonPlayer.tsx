@@ -83,6 +83,7 @@ export function LessonPlayer({
           thumbnails={player.thumbnails}
           videoId={player.videoId}
           resumeAt={player.resumeAt}
+          autoPlay
           onComplete={onComplete}
         />
       ) : (

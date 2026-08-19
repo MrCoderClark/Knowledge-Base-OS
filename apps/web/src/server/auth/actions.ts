@@ -19,6 +19,18 @@ const loginSchema = z.object({
   rememberMe: z.boolean().optional(),
 });
 
+/**
+ * Only allow same-site absolute paths as a post-login destination — blocks
+ * open redirects to protocol-relative (`//evil`) or external URLs.
+ */
+function safeNext(raw: FormDataEntryValue | null): string {
+  const v = typeof raw === "string" ? raw : "";
+  if (v.startsWith("/") && !v.startsWith("//") && !v.startsWith("/\\")) {
+    return v;
+  }
+  return "/";
+}
+
 export async function loginAction(
   _prev: LoginState,
   formData: FormData,
@@ -61,7 +73,7 @@ export async function loginAction(
   }
 
   await registerLoginSuccess({ ip, email });
-  redirect("/");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function logoutAction(): Promise<void> {

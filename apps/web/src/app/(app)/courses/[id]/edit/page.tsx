@@ -2,7 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { getActor, hasPermission } from "@/server/authz";
 import { listCategories } from "@/server/kb/categories";
 import { getCourse, getCourseLessons } from "@/server/kb/courses";
+import { listOrgMembers, listTeams } from "@/server/kb/members";
 import { listVideos } from "@/server/kb/videos";
+import { AssignCourse } from "../../AssignCourse";
 import { CourseBuilder } from "../../CourseBuilder";
 import { CourseForm } from "../../CourseForm";
 
@@ -19,10 +21,12 @@ export default async function EditCoursePage({
   const course = await getCourse(actor.orgId, id);
   if (!course) notFound();
 
-  const [lessons, cats, allVideos] = await Promise.all([
+  const [lessons, cats, allVideos, members, teams] = await Promise.all([
     getCourseLessons(id),
     listCategories(actor.orgId),
     listVideos(actor.orgId),
+    listOrgMembers(actor.orgId),
+    listTeams(actor.orgId),
   ]);
 
   const lessonVideoIds = new Set(lessons.map((l) => l.itemId));
@@ -62,6 +66,28 @@ export default async function EditCoursePage({
         }))}
         availableVideos={availableVideos}
       />
+
+      <section className="mt-8 rounded-xl border border-border bg-surface p-6">
+        <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold text-heading">
+          Assign this course
+        </h2>
+        <p className="mb-4 text-sm text-body">
+          Enroll people or a team. They&apos;ll be notified, and it shows in their
+          My Learning.
+          {course.status !== "published" && (
+            <span className="text-danger"> Publish the course so learners can open it.</span>
+          )}
+        </p>
+        <AssignCourse
+          courseId={course.id}
+          members={members.map((m) => ({
+            userId: m.userId,
+            name: m.name,
+            email: m.email,
+          }))}
+          teams={teams}
+        />
+      </section>
     </div>
   );
 }

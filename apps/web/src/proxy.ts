@@ -49,6 +49,12 @@ export function proxy(request: NextRequest): NextResponse {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
+  // Expose the requested path so server components can build a post-login
+  // return URL (there's no built-in "current pathname" in a server component).
+  requestHeaders.set(
+    "x-pathname",
+    request.nextUrl.pathname + request.nextUrl.search,
+  );
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 

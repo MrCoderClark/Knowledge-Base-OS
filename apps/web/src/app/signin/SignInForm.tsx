@@ -7,7 +7,13 @@ import type { LoginState } from "@/server/auth/auth-types";
 
 const initialState: LoginState = {};
 
-export function SignInForm({ resetDone = false }: { resetDone?: boolean }) {
+export function SignInForm({
+  resetDone = false,
+  next,
+}: {
+  resetDone?: boolean;
+  next?: string;
+}) {
   const [state, formAction, pending] = useActionState(loginAction, initialState);
 
   return (
@@ -35,6 +41,7 @@ export function SignInForm({ resetDone = false }: { resetDone?: boolean }) {
         )}
 
         <form action={formAction} className="space-y-4">
+          {next && <input type="hidden" name="next" value={next} />}
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-heading">
               Email
