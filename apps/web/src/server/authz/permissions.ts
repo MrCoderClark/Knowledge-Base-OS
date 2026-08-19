@@ -14,6 +14,7 @@ export type Permission =
   | "video:publish"
   | "category:manage"
   | "collection:manage"
+  | "course:manage"
   | "team:manage"
   | "member:invite"
   | "member:manage"
@@ -35,6 +36,7 @@ const ALL: Permission[] = [
   "video:publish",
   "category:manage",
   "collection:manage",
+  "course:manage",
   "team:manage",
   "member:invite",
   "member:manage",
@@ -56,6 +58,7 @@ const EDITOR: Permission[] = [
   "video:publish",
   "category:manage",
   "collection:manage",
+  "course:manage",
   "analytics:read",
 ];
 

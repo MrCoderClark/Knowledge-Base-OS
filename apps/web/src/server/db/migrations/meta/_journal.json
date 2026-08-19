@@ -57,6 +57,13 @@
       "when": 1786985853348,
       "tag": "0007_flat_landau",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786998980025,
+      "tag": "0008_heavy_rick_jones",
+      "breakpoints": true
     }
   ]
 }
