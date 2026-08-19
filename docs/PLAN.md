@@ -4,6 +4,7 @@ An enterprise knowledge base for documents, videos, and training/procedures with
 search, multi-tenant teams, RBAC, analytics, and (Phase 2) an AI chatbot helper.
 
 > This is the master plan. Detailed specs live in [`docs/specs/`](./specs).
+> **Live progress (done / outstanding / next): [`STATUS.md`](./STATUS.md)** — kept current each phase.
 > Visual language lives in [`DESIGN.md`](./DESIGN.md) and the `Dashboard.png` reference.
 
 ---

@@ -6,4 +6,5 @@ export type DocSaveResult =
   | { ok: false; error: string };
 
 export type VideoEditState = { error?: string };
+export type CourseFormState = { error?: string };
 

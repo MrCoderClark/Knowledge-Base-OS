@@ -271,6 +271,134 @@ export const jobStatus = pgEnum("job_status", [
   "failed",
 ]);
 
+/* ------------------------------------------------------------------ */
+/* Training / LMS — Courses → Lessons (see docs/STATUS.md)            */
+/* ------------------------------------------------------------------ */
+
+export const courseStatus = pgEnum("course_status", [
+  "draft",
+  "published",
+  "archived",
+]);
+export const lessonItemType = pgEnum("lesson_item_type", ["video", "document"]);
+export const enrollmentStatus = pgEnum("enrollment_status", [
+  "enrolled",
+  "completed",
+]);
+
+export const courses = pgTable(
+  "courses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+    categoryId: uuid("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+    status: courseStatus("status").notNull().default("draft"),
+    createdBy: text("created_by").references(() => users.id),
+    updatedBy: text("updated_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    unique().on(t.orgId, t.slug),
+    index("courses_org_created_idx").on(t.orgId, t.createdAt),
+  ],
+);
+
+export const courseLessons = pgTable(
+  "course_lessons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    itemType: lessonItemType("item_type").notNull(),
+    itemId: uuid("item_id").notNull(),
+    // Optional display override; defaults to the underlying item's title.
+    title: text("title"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("course_lessons_course_idx").on(t.courseId, t.position)],
+);
+
+export const enrollments = pgTable(
+  "enrollments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: enrollmentStatus("status").notNull().default("enrolled"),
+    enrolledAt: timestamp("enrolled_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [unique().on(t.courseId, t.userId)],
+);
+
+export const lessonCompletions = pgTable(
+  "lesson_completions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    courseLessonId: uuid("course_lesson_id")
+      .notNull()
+      .references(() => courseLessons.id, { onDelete: "cascade" }),
+    completedAt: timestamp("completed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [unique().on(t.userId, t.courseLessonId)],
+);
+
+export const progressItemType = pgEnum("progress_item_type", [
+  "video",
+  "collection",
+]);
+
+export const learningProgress = pgTable(
+  "learning_progress",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemType: progressItemType("item_type").notNull(),
+    itemId: uuid("item_id").notNull(),
+    progressPct: integer("progress_pct").notNull().default(0),
+    lastPositionSeconds: integer("last_position_seconds").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [unique().on(t.userId, t.itemType, t.itemId)],
+);
+
 export const jobs = pgTable(
   "jobs",
   {
