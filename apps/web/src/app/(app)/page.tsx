@@ -4,6 +4,7 @@ import {
   FileText,
   FilePlus2,
   FolderPlus,
+  GraduationCap,
   LayersIcon,
   MoreHorizontal,
   TrendingUp,
@@ -11,6 +12,10 @@ import {
   Video,
   VideoIcon,
 } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getActor } from "@/server/authz";
+import { continueLearning } from "@/server/kb/progress";
 
 /* ------------------------------------------------------------------ */
 /* Mock data — replaced by org-scoped queries once Neon/Drizzle lands. */
@@ -28,11 +33,6 @@ const stats = [
   { label: "Documents", value: "936", icon: FileText, note: "24 added this week" },
   { label: "Videos", value: "312", icon: Video, note: "8 new videos" },
   { label: "Active Users", value: "184", icon: Users, delta: "6% this month", trend: true },
-];
-
-const continueLearning = [
-  { title: "Workplace Safety Orientation", subtitle: "Module 3: Hazard Identification", progress: 68 },
-  { title: "Engineering Onboarding 2024", subtitle: "Section 2: Code Review Standards", progress: 35 },
 ];
 
 const recentlyAdded = [
@@ -97,13 +97,19 @@ function ProgressBar({ value }: { value: number }) {
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const actor = await getActor();
+  if (!actor) redirect("/signin");
+
+  const learning = await continueLearning(actor.orgId, actor.userId);
+  const firstName = actor.name?.split(" ")[0] ?? "there";
+
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
       {/* Greeting */}
       <header className="mb-8">
         <h1 className="text-[32px] font-semibold leading-tight tracking-tight text-heading">
-          Good morning, John
+          Good morning, {firstName}
         </h1>
         <p className="mt-1 text-body-lg text-body">
           Here&apos;s what&apos;s happening across your knowledge base.
@@ -149,23 +155,46 @@ export default function DashboardPage() {
           <section>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-heading">Continue Learning</h2>
-              <button className="text-sm font-medium text-indigo hover:underline">
+              <Link
+                href="/courses"
+                className="text-sm font-medium text-indigo hover:underline"
+              >
                 View All
-              </button>
+              </Link>
             </div>
-            <div className="space-y-3">
-              {continueLearning.map((c) => (
-                <Card key={c.title} className="flex items-center gap-4 p-4">
-                  <div className="size-16 shrink-0 rounded-lg bg-gradient-to-br from-indigo-soft to-nav-active" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-heading">{c.title}</div>
-                    <div className="mb-2 text-sm text-body">{c.subtitle}</div>
-                    <ProgressBar value={c.progress} />
-                  </div>
-                  <div className="text-sm font-medium text-body">{c.progress}%</div>
-                </Card>
-              ))}
-            </div>
+            {learning.length === 0 ? (
+              <Card className="p-6 text-center text-sm text-body">
+                No courses in progress.{" "}
+                <Link href="/courses" className="font-medium text-indigo hover:underline">
+                  Browse training
+                </Link>
+                .
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {learning.map((c) => (
+                  <Link
+                    key={c.courseId}
+                    href={`/courses/${c.courseId}?lesson=${c.resumeLessonId}`}
+                    className="block"
+                  >
+                    <Card className="flex items-center gap-4 p-4">
+                      <div className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-soft to-nav-active text-indigo">
+                        <GraduationCap className="size-7" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-heading">{c.title}</div>
+                        <div className="mb-2 truncate text-sm text-body">
+                          Up next: {c.subtitle}
+                        </div>
+                        <ProgressBar value={c.coursePct} />
+                      </div>
+                      <div className="text-sm font-medium text-body">{c.coursePct}%</div>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Recently added */}
