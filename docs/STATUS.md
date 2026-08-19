@@ -3,12 +3,12 @@
 Living tracker of what's **done**, **outstanding**, and **next**. Update this at the end
 of each phase/slice. Plan + specs: [`PLAN.md`](./PLAN.md) · [`specs/`](./specs).
 
-_Last updated: 2026-08-19 (Training slice A merged; **LMS Wave 1** built on branch
-`phase-1-training-b`)._
+_Last updated: 2026-08-19 (LMS Wave 1 merged; **Wave 2** built on branch
+`phase-1-training-c`)._
 
-**Current branch:** `phase-1-training-b` (unmerged). **Working on:** Training/LMS →
-enterprise LMS roadmap (5 waves). **Do next:** verify + commit **Wave 1**
-(watch-to-complete + resume), then Wave 2 (enrollment/assignment/My Learning).
+**Current branch:** `phase-1-training-c` (unmerged). **Working on:** Training/LMS →
+enterprise LMS roadmap (5 waves). **Do next:** run migration + verify + commit **Wave 2**
+(enrollment/assignment/notifications/My Learning), then Wave 3 (compliance/certificates).
 
 ---
 
@@ -20,7 +20,7 @@ enterprise LMS roadmap (5 waves). **Do next:** verify + commit **Wave 1**
 | Phase 1a — Auth (production) | ✅ merged to `main` |
 | Phase 1 — Core KB | 🟡 partial (Categories, Documents, Videos, Browse done) |
 | Phase 2 — Video pipeline | ✅ merged to `main` (2a→2d-ii) |
-| **Training / LMS** | 🚧 in progress — slice A merged; **Wave 1 built** on `phase-1-training-b` |
+| **Training / LMS** | 🚧 in progress — Wave 1 merged; **Wave 2 built** on `phase-1-training-c` |
 | Phase 2 — AI (2e) | ⬜ not started |
 | Phase 3 — Enterprise hardening | ⬜ not started |
 
@@ -89,9 +89,20 @@ analytics, quizzes, Trailhead-style badges, notes, notifications. Ships wave by 
 - [x] **Dashboard Continue Learning** = real in-progress courses (`app/(app)/page.tsx`).
 - No migration (tables already existed). Other dashboard KPIs/Recently-Added/Activity still mock.
 
-**Wave 2 — Enrollment, Assignment, My Learning** · migration (enrollments +cols, notifications):
-self-enroll + admin/team **assign** + **due dates/overdue**, in-app **notifications**,
-**/my-learning** hub, course **overview page**.
+**Wave 2 — Enrollment, Assignment, My Learning — BUILT (migrate + verify + commit on `phase-1-training-c`):**
+- [x] **Migration** — `enrollments` +`assignedBy`/`assignedTeamId`/`dueAt`; new `notifications`
+  table + enum. Run `bun run db:generate` then `bun run db:migrate`.
+- [x] **Assignment** — admin **assign to people and/or a team** with an optional **due date**
+  (`assignCourseAction`; `enrollments.ts` `assignCourse`/`teamMemberIds`); Assign UI on the
+  course **edit** page (`courses/AssignCourse.tsx`). Self-enroll on course **start**.
+- [x] **Notifications** — `notifications.ts` service + `notification-actions.ts`; bell w/ unread
+  badge + dropdown in the topbar (`components/shell/NotificationBell.tsx`, fetched in
+  `(app)/layout.tsx`); fires on assign + course-completion; **email** via existing sender
+  (`sendCourseAssignedEmail`, best-effort).
+- [x] **My Learning** (`/my-learning`, sidebar) — In-progress / Assigned / Overdue / Completed
+  tabs (`myCourses` in `progress.ts`); overdue = `dueAt < now`.
+- [x] **Course overview page** — `/courses/[id]` with no `?lesson=` now shows syllabus +
+  progress + Start/Continue CTA; the player shows when a lesson is selected.
 
 **Wave 3 — Compliance, Certificates, Analytics, Anti-skip** · migration: **certificates** +
 verify page, **required-training + compliance dashboard**, **admin analytics + CSV export**,

@@ -1,10 +1,11 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   courseLessons,
   courses,
   enrollments,
   lessonCompletions,
+  teamMembers,
 } from "@/server/db/schema";
 
 /** Enroll a learner in a course if they aren't already (idempotent). */
@@ -105,4 +106,107 @@ export async function isEnrolled(
       ),
     );
   return !!row;
+}
+
+/** User ids belonging to a team (within the org via the team). */
+export async function teamMemberIds(teamId: string): Promise<string[]> {
+  const rows = await db
+    .select({ userId: teamMembers.userId })
+    .from(teamMembers)
+    .where(eq(teamMembers.teamId, teamId));
+  return rows.map((r) => r.userId);
+}
+
+/**
+ * Admin assignment — enroll each user, stamping who assigned it, an optional
+ * deadline, and the originating team. Re-assigning updates the deadline
+ * without disturbing existing progress/completion. Returns the assigned ids.
+ */
+export async function assignCourse(params: {
+  orgId: string;
+  courseId: string;
+  userIds: string[];
+  assignedBy: string;
+  dueAt: Date | null;
+  teamId?: string | null;
+}): Promise<string[]> {
+  const ids = [...new Set(params.userIds)];
+  if (ids.length === 0) return [];
+
+  await db
+    .insert(enrollments)
+    .values(
+      ids.map((userId) => ({
+        orgId: params.orgId,
+        courseId: params.courseId,
+        userId,
+        assignedBy: params.assignedBy,
+        assignedTeamId: params.teamId ?? null,
+        dueAt: params.dueAt,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [enrollments.courseId, enrollments.userId],
+      set: {
+        assignedBy: params.assignedBy,
+        assignedTeamId: params.teamId ?? null,
+        dueAt: params.dueAt,
+      },
+    });
+
+  return ids;
+}
+
+export type EnrollmentRow = {
+  courseId: string;
+  title: string;
+  status: "enrolled" | "completed";
+  assignedBy: string | null;
+  dueAt: Date | null;
+  enrolledAt: Date;
+  completedAt: Date | null;
+};
+
+/** Every enrollment for a learner (any status), with course info. */
+export function listEnrollmentsWithCourse(
+  orgId: string,
+  userId: string,
+): Promise<EnrollmentRow[]> {
+  return db
+    .select({
+      courseId: courses.id,
+      title: courses.title,
+      status: enrollments.status,
+      assignedBy: enrollments.assignedBy,
+      dueAt: enrollments.dueAt,
+      enrolledAt: enrollments.enrolledAt,
+      completedAt: enrollments.completedAt,
+    })
+    .from(enrollments)
+    .innerJoin(courses, eq(enrollments.courseId, courses.id))
+    .where(
+      and(
+        eq(enrollments.orgId, orgId),
+        eq(enrollments.userId, userId),
+        ne(courses.status, "archived"),
+      ),
+    );
+}
+
+/** Enrollment ids that already exist for a course/user set (for diffing). */
+export async function existingEnrolleeIds(
+  courseId: string,
+  userIds: string[],
+): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const rows = await db
+    .select({ userId: enrollments.userId })
+    .from(enrollments)
+    .where(
+      and(
+        eq(enrollments.courseId, courseId),
+        inArray(enrollments.userId, userIds),
+      ),
+    );
+  return new Set(rows.map((r) => r.userId));
 }

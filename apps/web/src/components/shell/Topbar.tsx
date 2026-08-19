@@ -1,11 +1,14 @@
-import { Bell, HelpCircle, Search } from "lucide-react";
+import { HelpCircle, Search } from "lucide-react";
+import { NotificationBell, type NotificationItem } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
 
 type Props = {
   user: { name: string | null; email: string };
+  notifications?: NotificationItem[];
+  unreadCount?: number;
 };
 
-export function Topbar({ user }: Props) {
+export function Topbar({ user, notifications = [], unreadCount = 0 }: Props) {
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border bg-surface px-6">
       {/* Command-K search (visual for now; wired in the Search feature) */}
@@ -26,12 +29,7 @@ export function Topbar({ user }: Props) {
           <HelpCircle className="size-5" />
           Help
         </button>
-        <button
-          aria-label="Notifications"
-          className="rounded-md p-2 text-body hover:bg-nav-active hover:text-slate"
-        >
-          <Bell className="size-5" />
-        </button>
+        <NotificationBell items={notifications} unread={unreadCount} />
         <div className="ml-1">
           <UserMenu user={user} />
         </div>

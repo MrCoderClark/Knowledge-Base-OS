@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   BarChart3,
+  BookMarked,
   BookOpen,
   FileText,
   FolderTree,
@@ -29,6 +30,7 @@ export const primaryNav: NavItem[] = [
   { label: "Videos", href: "/videos", icon: Video },
   { label: "Categories", href: "/categories", icon: FolderTree },
   { label: "Training", href: "/courses", icon: GraduationCap },
+  { label: "My Learning", href: "/my-learning", icon: BookMarked },
   { label: "Search", href: "/search", icon: Search },
   { label: "Users", href: "/users", icon: Users },
   { label: "Teams", href: "/teams", icon: UsersRound },

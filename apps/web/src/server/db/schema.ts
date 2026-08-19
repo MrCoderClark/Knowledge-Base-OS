@@ -348,6 +348,15 @@ export const enrollments = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     status: enrollmentStatus("status").notNull().default("enrolled"),
+    // Assignment metadata: who assigned it (null = self-enrolled), optional
+    // originating team, and an optional deadline for compliance tracking.
+    assignedBy: text("assigned_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    assignedTeamId: uuid("assigned_team_id").references(() => teams.id, {
+      onDelete: "set null",
+    }),
+    dueAt: timestamp("due_at", { withTimezone: true }),
     enrolledAt: timestamp("enrolled_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -397,6 +406,34 @@ export const learningProgress = pgTable(
       .notNull(),
   },
   (t) => [unique().on(t.userId, t.itemType, t.itemId)],
+);
+
+export const notificationType = pgEnum("notification_type", [
+  "course_assigned",
+  "course_completed",
+  "course_due_soon",
+]);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: notificationType("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    linkUrl: text("link_url"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("notifications_user_idx").on(t.userId, t.createdAt)],
 );
 
 export const jobs = pgTable(
