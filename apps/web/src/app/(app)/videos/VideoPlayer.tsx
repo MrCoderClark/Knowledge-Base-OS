@@ -227,7 +227,13 @@ export function VideoPlayer({
       {captions && (
         <Track kind="subtitles" src={captions} label="English" language="en" />
       )}
-      <DefaultVideoLayout thumbnails={thumbnails} icons={defaultLayoutIcons} />
+      {/* Always use the full bottom control bar (don't switch to Vidstack's
+          compact split-top/bottom layout on smaller measured sizes). */}
+      <DefaultVideoLayout
+        smallLayoutWhen={false}
+        thumbnails={thumbnails}
+        icons={defaultLayoutIcons}
+      />
     </MediaPlayer>
   );
 }
