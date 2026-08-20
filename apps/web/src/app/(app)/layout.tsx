@@ -6,6 +6,7 @@ import { Topbar } from "@/components/shell/Topbar";
 import { can, getActor } from "@/server/authz";
 import { getCurrentSession } from "@/server/auth/session";
 import { listNotifications, unreadCount } from "@/server/kb/notifications";
+import { getOrg } from "@/server/kb/org";
 
 export default async function AppLayout({
   children,
@@ -19,12 +20,13 @@ export default async function AppLayout({
   }
 
   const actor = await getActor();
-  const [notifications, unread] = actor
+  const [notifications, unread, org] = actor
     ? await Promise.all([
         listNotifications(actor.userId),
         unreadCount(actor.userId),
+        getOrg(actor.orgId),
       ])
-    : [[], 0];
+    : [[], 0, null];
 
   // Nav items visible to this user (by role or granted permission).
   const allowed = [...primaryNav, ...footerNav]
@@ -34,7 +36,11 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar allowed={allowed} canCreateDoc={canCreateDoc} />
+      <Sidebar
+        allowed={allowed}
+        canCreateDoc={canCreateDoc}
+        orgName={org?.name ?? null}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           user={session.user}
