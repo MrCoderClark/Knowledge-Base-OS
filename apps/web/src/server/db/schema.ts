@@ -463,6 +463,72 @@ export const certificates = pgTable(
   (t) => [unique().on(t.userId, t.courseId)],
 );
 
+/* ------------------------------------------------------------------ */
+/* Training / LMS — Quizzes (see docs/STATUS.md, Wave 4)              */
+/* ------------------------------------------------------------------ */
+
+export const quizzes = pgTable(
+  "quizzes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    // Null = end-of-course quiz; otherwise gates that specific lesson.
+    lessonId: uuid("lesson_id").references(() => courseLessons.id, {
+      onDelete: "cascade",
+    }),
+    title: text("title").notNull().default("Quiz"),
+    passPct: integer("pass_pct").notNull().default(70),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("quizzes_course_idx").on(t.courseId)],
+);
+
+export const quizQuestions = pgTable(
+  "quiz_questions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    quizId: uuid("quiz_id")
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    prompt: text("prompt").notNull(),
+    // Array of answer choices.
+    options: jsonb("options").notNull(),
+    correctIndex: integer("correct_index").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("quiz_questions_quiz_idx").on(t.quizId, t.position)],
+);
+
+export const quizAttempts = pgTable(
+  "quiz_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    quizId: uuid("quiz_id")
+      .notNull()
+      .references(() => quizzes.id, { onDelete: "cascade" }),
+    score: integer("score").notNull(),
+    passed: boolean("passed").notNull(),
+    answers: jsonb("answers").notNull(),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("quiz_attempts_user_idx").on(t.userId, t.quizId)],
+);
+
 export const jobs = pgTable(
   "jobs",
   {

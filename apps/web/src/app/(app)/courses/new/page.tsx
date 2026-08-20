@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { isAIConfigured } from "@/server/ai";
 import { getActor, hasPermission } from "@/server/authz";
 import { listCategories } from "@/server/kb/categories";
 import { CourseForm } from "../CourseForm";
@@ -21,7 +22,10 @@ export default async function NewCoursePage() {
         </p>
       </header>
       <section className="rounded-xl border border-border bg-surface p-6">
-        <CourseForm categories={cats.map((c) => ({ id: c.id, name: c.name }))} />
+        <CourseForm
+          categories={cats.map((c) => ({ id: c.id, name: c.name }))}
+          aiEnabled={isAIConfigured()}
+        />
       </section>
     </div>
   );

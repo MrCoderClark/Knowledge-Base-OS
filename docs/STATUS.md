@@ -3,12 +3,12 @@
 Living tracker of what's **done**, **outstanding**, and **next**. Update this at the end
 of each phase/slice. Plan + specs: [`PLAN.md`](./PLAN.md) · [`specs/`](./specs).
 
-_Last updated: 2026-08-20 (LMS Wave 2 merged; **Wave 3** built on branch
-`phase-1-training-d`)._
+_Last updated: 2026-08-20 (LMS Wave 3 merged; **Wave 4 + AI helpers** built on branch
+`phase-1-training-e`)._
 
-**Current branch:** `phase-1-training-d` (unmerged). **Working on:** Training/LMS →
-enterprise LMS roadmap (5 waves). **Do next:** run migration + verify + commit **Wave 3**
-(certificates/compliance/analytics/anti-skip), then Wave 4 (quizzes).
+**Current branch:** `phase-1-training-e` (unmerged). **Working on:** Training/LMS →
+enterprise LMS roadmap. **Do next:** run migration + configure a free AI key + verify +
+commit **Wave 4** (quizzes + AI helpers), then Wave 5 (badges/notes/email).
 
 ---
 
@@ -20,7 +20,7 @@ enterprise LMS roadmap (5 waves). **Do next:** run migration + verify + commit *
 | Phase 1a — Auth (production) | ✅ merged to `main` |
 | Phase 1 — Core KB | 🟡 partial (Categories, Documents, Videos, Browse done) |
 | Phase 2 — Video pipeline | ✅ merged to `main` (2a→2d-ii) |
-| **Training / LMS** | 🚧 in progress — Wave 2 merged; **Wave 3 built** on `phase-1-training-d` |
+| **Training / LMS** | 🚧 in progress — Wave 3 merged; **Wave 4 + AI built** on `phase-1-training-e` |
 | Phase 2 — AI (2e) | ⬜ not started |
 | Phase 3 — Enterprise hardening | ⬜ not started |
 
@@ -118,7 +118,22 @@ analytics, quizzes, Trailhead-style badges, notes, notifications. Ships wave by 
   (`CourseSettings.tsx` → `setCourseFlagsAction`); player clamps forward seeks past the
   furthest-watched point when `antiSkip`; Required/No-skipping badges on the overview.
 
-**Wave 4 — Quizzes & pass-gating** · migration: quiz authoring/taking + gating.
+**Wave 4 — Quizzes & pass-gating + AI helpers — BUILT (migrate + AI key + verify + commit on `phase-1-training-e`):**
+- [x] **AI provider abstraction** — `server/ai/` (`AIProvider` interface + `openrouter` +
+  `gemini`, fetch-based, env-selected via `AI_PROVIDER`; `isAIConfigured()`). Free models
+  now; Claude is a drop-in later. Optional env keys in `.env.example`.
+- [x] **AI helper: course outline** — New Course page "Draft with AI" → title/description +
+  suggested lessons pre-fill the builder (`ai-actions.ts` `generateCourseOutlineAction`).
+- [x] **Migration** — `quizzes`, `quiz_questions`, `quiz_attempts`. Run `db:generate`/`db:migrate`.
+- [x] **Quiz authoring** — course edit "Course quiz" section (`QuizEditor.tsx`): manual
+  Q&A + **"Generate with AI"** from a **lesson transcript** *or* a **prompt**
+  (`quiz-actions.ts` `generateQuizAction`, VTT→text; `saveQuizAction`).
+- [x] **Quiz taking + gating** — `QuizPanel.tsx` on the course overview (answers graded
+  **server-side**, correct answers never sent to client); passing gates course completion +
+  certificate via `course-completion.ts` `finalizeCourseIfComplete` (used by both
+  lesson-complete and quiz-submit).
+- Note: quizzes are **course-level** (end-of-course). Per-lesson quiz gating is scaffolded
+  in the schema (`quizzes.lessonId`) but not yet surfaced in the editor.
 
 **Wave 5 — Gamification, Notes, Email** · migration: **Trailhead-style badges + points**,
 **timestamped notes**, **email reminders** (existing sender).
