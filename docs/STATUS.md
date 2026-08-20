@@ -165,7 +165,11 @@ generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API
   **`/permissions`** page to set role + toggle individual grants (last-admin guard). Admin pages
   (users, analytics) now gate via `can()`. **Analytics** page shipped in Wave 3.
 - [ ] **Teams**, **Activity** feed (needs `activity_events` logging), **Settings** (pages still missing; nav hidden until built).
-- [ ] **Search** — command-K over docs/videos (Postgres FTS; see [`04`](./specs/04-search.md)).
+- [x] **Search** (Phase 1, `phase-1-search`) — `SearchProvider` interface + `PgFtsProvider`
+  (Postgres FTS: `websearch_to_tsquery`/`ts_rank_cd`/`ts_headline` + title `ILIKE` union,
+  org-scoped, published/ready only). **⌘K command palette** (`SearchPalette`) + `/search` page
+  + `GET /api/search`. No migration (tsvector computed on read). **Deferred to Phase 2:** generated
+  tsvector columns + GIN indexes + `pg_trgm`, and pgvector hybrid (same interface).
 
 ### Video — product features
 - [ ] **Watch-progress + resume** → powers Continue Learning.
