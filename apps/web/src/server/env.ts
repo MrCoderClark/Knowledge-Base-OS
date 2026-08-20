@@ -32,6 +32,15 @@ const schema = z.object({
   AI_SERVICE_URL: z.string().url(),
   AI_SERVICE_TOKEN: z.string().min(1),
 
+  // LLM helpers (optional — features degrade gracefully if unset).
+  AI_PROVIDER: z.enum(["openrouter", "gemini"]).optional(),
+  OPENROUTER_API_KEY: z.string().optional(),
+  // OpenRouter's free catalog rotates; set OPENROUTER_MODEL to a current ":free"
+  // slug from https://openrouter.ai/models?max_price=0
+  OPENROUTER_MODEL: z.string().default("nvidia/nemotron-3.5-lightning:free"),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
+
   SEED_ADMIN_EMAIL: z.string().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),
   SEED_ADMIN_NAME: z.string().optional(),

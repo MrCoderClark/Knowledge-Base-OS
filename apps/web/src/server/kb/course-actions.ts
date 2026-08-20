@@ -18,16 +18,11 @@ import {
 } from "./courses";
 import { env } from "@/server/env";
 import { sendCourseAssignedEmail } from "@/server/email";
-import { issueCertificate } from "./certificates";
-import {
-  assignCourse,
-  completeEnrollmentIfDone,
-  ensureEnrollment,
-  teamMemberIds,
-} from "./enrollments";
+import { finalizeCourseIfComplete } from "./course-completion";
+import { assignCourse, ensureEnrollment, teamMemberIds } from "./enrollments";
 import type { CourseFormState } from "./kb-types";
 import { listOrgMembers } from "./members";
-import { createNotification, notifyMany } from "./notifications";
+import { notifyMany } from "./notifications";
 
 const courseSchema = z.object({
   id: z.string().uuid().optional(),
@@ -157,19 +152,9 @@ export async function completeLessonAction(
   if (!actor) return;
   await ensureEnrollment(actor.orgId, courseId, actor.userId);
   await markLessonComplete(actor.userId, lessonId);
-  const justFinished = await completeEnrollmentIfDone(courseId, actor.userId);
-  if (justFinished) {
-    const course = await getCourse(actor.orgId, courseId);
-    const code = await issueCertificate(actor.orgId, actor.userId, courseId);
-    await createNotification({
-      orgId: actor.orgId,
-      userId: actor.userId,
-      type: "course_completed",
-      title: `Course complete: ${course?.title ?? "Course"}`,
-      body: "You've finished every lesson — your certificate is ready. 🎉",
-      linkUrl: `/verify/${code}`,
-    });
-  }
+  // Completes the enrollment + issues the certificate only if there's no
+  // course quiz, or the learner has already passed it.
+  await finalizeCourseIfComplete(actor.orgId, actor.userId, courseId);
   revalidatePath(`/courses/${courseId}`);
   revalidatePath("/");
   revalidatePath("/my-learning");

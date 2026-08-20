@@ -6,8 +6,10 @@ import { getCertificateCode } from "@/server/kb/certificates";
 import { completedLessonIds, getCourse, getCourseLessons } from "@/server/kb/courses";
 import { ensureEnrollment } from "@/server/kb/enrollments";
 import { getVideoProgressMap } from "@/server/kb/progress";
+import { getCourseQuiz, hasPassedQuiz } from "@/server/kb/quizzes";
 import { getVideo } from "@/server/kb/videos";
 import { LessonPlayer } from "../LessonPlayer";
+import { QuizPanel } from "../QuizPanel";
 
 function fmtDuration(total: number): string | null {
   if (!total) return null;
@@ -153,12 +155,17 @@ export default async function CourseViewPage({
     const totalDuration = fmtDuration(
       lessons.reduce((s, l) => s + (l.videoDuration ?? 0), 0),
     );
+    const courseQuiz = await getCourseQuiz(course.id);
+    const quizPassed =
+      courseQuiz && courseQuiz.questions.length > 0
+        ? await hasPassedQuiz(actor.userId, courseQuiz.id)
+        : false;
 
     return (
       <div className="mx-auto max-w-[1200px] px-8 py-8">
         {header}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+          <div className="space-y-6 lg:col-span-2">
             <div className="rounded-xl border border-border bg-surface p-6">
               {course.description ? (
                 <p className="whitespace-pre-line text-body">{course.description}</p>
@@ -206,6 +213,18 @@ export default async function CourseViewPage({
                 )}
               </div>
             </div>
+            {courseQuiz && courseQuiz.questions.length > 0 && (
+              <QuizPanel
+                quizId={courseQuiz.id}
+                title={courseQuiz.title}
+                passPct={courseQuiz.passPct}
+                alreadyPassed={quizPassed}
+                questions={courseQuiz.questions.map((q) => ({
+                  prompt: q.prompt,
+                  options: q.options,
+                }))}
+              />
+            )}
           </div>
           <aside>
             <h2 className="mb-3 border-b border-border pb-2 text-lg font-semibold text-heading">

@@ -1,13 +1,16 @@
 import { notFound, redirect } from "next/navigation";
+import { isAIConfigured } from "@/server/ai";
 import { getActor, hasPermission } from "@/server/authz";
 import { listCategories } from "@/server/kb/categories";
 import { getCourse, getCourseLessons } from "@/server/kb/courses";
 import { listOrgMembers, listTeams } from "@/server/kb/members";
+import { getCourseQuiz } from "@/server/kb/quizzes";
 import { listVideos } from "@/server/kb/videos";
 import { AssignCourse } from "../../AssignCourse";
 import { CourseBuilder } from "../../CourseBuilder";
 import { CourseForm } from "../../CourseForm";
 import { CourseSettings } from "../../CourseSettings";
+import { QuizEditor } from "../../QuizEditor";
 
 export default async function EditCoursePage({
   params,
@@ -22,12 +25,13 @@ export default async function EditCoursePage({
   const course = await getCourse(actor.orgId, id);
   if (!course) notFound();
 
-  const [lessons, cats, allVideos, members, teams] = await Promise.all([
+  const [lessons, cats, allVideos, members, teams, quiz] = await Promise.all([
     getCourseLessons(id),
     listCategories(actor.orgId),
     listVideos(actor.orgId),
     listOrgMembers(actor.orgId),
     listTeams(actor.orgId),
+    getCourseQuiz(id),
   ]);
 
   const lessonVideoIds = new Set(lessons.map((l) => l.itemId));
@@ -96,6 +100,38 @@ export default async function EditCoursePage({
             email: m.email,
           }))}
           teams={teams}
+        />
+      </section>
+
+      <section className="mt-8 rounded-xl border border-border bg-surface p-6">
+        <h2 className="mb-1 text-lg font-semibold text-heading">Course quiz</h2>
+        <p className="mb-4 text-sm text-body">
+          An optional end-of-course quiz. When set, learners must pass it to
+          complete the course.
+        </p>
+        <QuizEditor
+          courseId={course.id}
+          aiEnabled={isAIConfigured()}
+          lessons={lessons
+            .filter((l) => l.itemType === "video")
+            .map((l) => ({
+              lessonId: l.id,
+              videoId: l.itemId,
+              title: l.overrideTitle ?? l.videoTitle ?? "Lesson",
+            }))}
+          initial={
+            quiz
+              ? {
+                  title: quiz.title,
+                  passPct: quiz.passPct,
+                  questions: quiz.questions.map((q) => ({
+                    prompt: q.prompt,
+                    options: q.options,
+                    correctIndex: q.correctIndex,
+                  })),
+                }
+              : null
+          }
         />
       </section>
     </div>
