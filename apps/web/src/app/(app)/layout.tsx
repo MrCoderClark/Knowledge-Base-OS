@@ -1,8 +1,9 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { footerNav, primaryNav } from "@/components/shell/nav";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Topbar } from "@/components/shell/Topbar";
-import { getActor } from "@/server/authz";
+import { can, getActor } from "@/server/authz";
 import { getCurrentSession } from "@/server/auth/session";
 import { listNotifications, unreadCount } from "@/server/kb/notifications";
 
@@ -25,9 +26,15 @@ export default async function AppLayout({
       ])
     : [[], 0];
 
+  // Nav items visible to this user (by role or granted permission).
+  const allowed = [...primaryNav, ...footerNav]
+    .filter((i) => !i.permission || (actor != null && can(actor, i.permission)))
+    .map((i) => i.href);
+  const canCreateDoc = actor != null && can(actor, "document:create");
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      <Sidebar allowed={allowed} canCreateDoc={canCreateDoc} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           user={session.user}

@@ -84,6 +84,11 @@ export const memberships = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     role: orgRole("role").notNull().default("viewer"),
     status: membershipStatus("status").notNull().default("active"),
+    // Per-member permission grants layered on top of the role's permissions.
+    extraPermissions: jsonb("extra_permissions")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     invitedBy: text("invited_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },

@@ -1,7 +1,7 @@
 import { AlertTriangle, BarChart3, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getActor, hasPermission } from "@/server/authz";
+import { can, getActor } from "@/server/authz";
 import { courseAnalytics, orgSummary } from "@/server/kb/analytics";
 
 function Stat({
@@ -30,7 +30,7 @@ function Stat({
 export default async function AnalyticsPage() {
   const actor = await getActor();
   if (!actor) redirect("/signin");
-  if (!hasPermission(actor.role, "analytics:read")) redirect("/");
+  if (!can(actor, "analytics:read")) redirect("/");
 
   const rows = await courseAnalytics(actor.orgId);
   const summary = orgSummary(rows);

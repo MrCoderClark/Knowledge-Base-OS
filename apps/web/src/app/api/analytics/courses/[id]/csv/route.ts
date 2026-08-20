@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getActor, hasPermission } from "@/server/authz";
+import { can, getActor } from "@/server/authz";
 import { getCourseMeta, learnerProgress } from "@/server/kb/analytics";
 
 function csvCell(value: string | number | null): string {
@@ -20,7 +20,7 @@ export async function GET(
   const { id } = await params;
   const actor = await getActor();
   if (!actor) return new NextResponse("Unauthorized", { status: 401 });
-  if (!hasPermission(actor.role, "analytics:read")) {
+  if (!can(actor, "analytics:read")) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 

@@ -1,7 +1,7 @@
 import { ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getActor, hasPermission } from "@/server/authz";
+import { can, getActor } from "@/server/authz";
 import { getCourseMeta, learnerProgress } from "@/server/kb/analytics";
 
 function fmtDate(d: Date | null): string {
@@ -22,7 +22,7 @@ export default async function CourseLearnersPage({
   const { courseId } = await params;
   const actor = await getActor();
   if (!actor) redirect("/signin");
-  if (!hasPermission(actor.role, "analytics:read")) redirect("/");
+  if (!can(actor, "analytics:read")) redirect("/");
 
   const course = await getCourseMeta(actor.orgId, courseId);
   if (!course) notFound();
