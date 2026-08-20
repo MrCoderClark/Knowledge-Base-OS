@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   foreignKey,
   index,
   integer,
@@ -300,6 +301,10 @@ export const courses = pgTable(
       onDelete: "set null",
     }),
     status: courseStatus("status").notNull().default("draft"),
+    // Mandatory for compliance tracking (surfaces in the compliance dashboard).
+    required: boolean("required").notNull().default(false),
+    // Prevent seeking past unwatched content so completion means genuinely watched.
+    antiSkip: boolean("anti_skip").notNull().default(false),
     createdBy: text("created_by").references(() => users.id),
     updatedBy: text("updated_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -434,6 +439,28 @@ export const notifications = pgTable(
       .notNull(),
   },
   (t) => [index("notifications_user_idx").on(t.userId, t.createdAt)],
+);
+
+export const certificates = pgTable(
+  "certificates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    // Public, shareable verification code.
+    code: text("code").notNull().unique(),
+    issuedAt: timestamp("issued_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [unique().on(t.userId, t.courseId)],
 );
 
 export const jobs = pgTable(

@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { learningProgress } from "@/server/db/schema";
+import { getCertificateCode } from "./certificates";
 import { completedLessonIds, getCourseLessons } from "./courses";
 import { listEnrollmentsWithCourse } from "./enrollments";
 
@@ -121,6 +122,8 @@ export type MyCourseCard = {
   resumeLessonId: string | null;
   /** Title of the next lesson to resume (null when finished/empty). */
   nextLessonTitle: string | null;
+  /** Verification code once the course is completed (else null). */
+  certificateCode: string | null;
   lastActivity: Date;
 };
 
@@ -162,6 +165,10 @@ export async function myCourses(
 
     const next = lessons.find((l) => !completed.has(l.id)) ?? null;
     const prog = next?.itemId != null ? progress.get(next.itemId) : undefined;
+    const certificateCode =
+      e.status === "completed"
+        ? await getCertificateCode(userId, e.courseId)
+        : null;
 
     cards.push({
       courseId: e.courseId,
@@ -177,6 +184,7 @@ export async function myCourses(
       nextLessonTitle: next
         ? (next.overrideTitle ?? next.videoTitle ?? "Lesson")
         : null,
+      certificateCode,
       lastActivity: prog?.updatedAt ?? e.completedAt ?? e.enrolledAt,
     });
   }

@@ -25,6 +25,8 @@ type Props = {
   player: PlayerSrc | null;
   /** Whether this lesson was already complete on load. */
   completed: boolean;
+  /** Block seeking past unwatched content (compliance courses). */
+  antiSkip?: boolean;
 };
 
 const AUTOPLAY_SECONDS = 5;
@@ -36,6 +38,7 @@ export function LessonPlayer({
   nextLessonTitle,
   player,
   completed,
+  antiSkip,
 }: Props) {
   const router = useRouter();
   const [showUpNext, setShowUpNext] = useState(false);
@@ -84,6 +87,7 @@ export function LessonPlayer({
           videoId={player.videoId}
           resumeAt={player.resumeAt}
           autoPlay
+          antiSkip={antiSkip}
           onComplete={onComplete}
         />
       ) : (

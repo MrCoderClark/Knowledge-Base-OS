@@ -12,11 +12,13 @@ import {
   markLessonComplete,
   removeLesson,
   reorderLessons,
+  setCourseFlags,
   setCourseStatus,
   updateCourse,
 } from "./courses";
 import { env } from "@/server/env";
 import { sendCourseAssignedEmail } from "@/server/email";
+import { issueCertificate } from "./certificates";
 import {
   assignCourse,
   completeEnrollmentIfDone,
@@ -97,6 +99,18 @@ export async function setCourseStatusAction(
   revalidatePath("/courses");
 }
 
+export async function setCourseFlagsAction(
+  courseId: string,
+  required: boolean,
+  antiSkip: boolean,
+): Promise<void> {
+  const { actor } = await requireCourse(courseId);
+  await setCourseFlags({ orgId: actor.orgId, id: courseId, required, antiSkip });
+  revalidatePath(`/courses/${courseId}`);
+  revalidatePath(`/courses/${courseId}/edit`);
+  revalidatePath("/analytics");
+}
+
 export async function deleteCourseAction(courseId: string): Promise<void> {
   const { actor } = await requireCourse(courseId);
   await deleteCourse({ orgId: actor.orgId, id: courseId });
@@ -146,13 +160,14 @@ export async function completeLessonAction(
   const justFinished = await completeEnrollmentIfDone(courseId, actor.userId);
   if (justFinished) {
     const course = await getCourse(actor.orgId, courseId);
+    const code = await issueCertificate(actor.orgId, actor.userId, courseId);
     await createNotification({
       orgId: actor.orgId,
       userId: actor.userId,
       type: "course_completed",
       title: `Course complete: ${course?.title ?? "Course"}`,
-      body: "You've finished every lesson. 🎉",
-      linkUrl: `/courses/${courseId}`,
+      body: "You've finished every lesson — your certificate is ready. 🎉",
+      linkUrl: `/verify/${code}`,
     });
   }
   revalidatePath(`/courses/${courseId}`);

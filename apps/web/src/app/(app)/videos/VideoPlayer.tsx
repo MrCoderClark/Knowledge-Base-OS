@@ -35,12 +35,15 @@ type Props = {
   resumeAt?: number;
   /** Start playback automatically (used for course lessons). */
   autoPlay?: boolean;
+  /** Block seeking past the furthest-watched point (compliance courses). */
+  antiSkip?: boolean;
   /** Fired once when the video is watched to the end (≥95% or `ended`). */
   onComplete?: () => void;
 };
 
 const COMPLETE_AT = 0.95; // fraction watched that counts as "complete"
 const SAVE_EVERY = 10; // seconds of playback between progress saves
+const SKIP_BUFFER = 2; // seconds of forward jump allowed before anti-skip clamps
 
 export function VideoPlayer({
   src,
@@ -51,6 +54,7 @@ export function VideoPlayer({
   videoId,
   resumeAt,
   autoPlay,
+  antiSkip,
   onComplete,
 }: Props) {
   const controls = usePlayerControls();
@@ -60,10 +64,10 @@ export function VideoPlayer({
   // (a churning ref-callback would tear down/re-create the subscription).
   // The subscribe callback reads cfg.current at playback time — after effects
   // run — so updating it in an effect keeps it current without ref churn.
-  const cfg = useRef({ videoId, resumeAt, onComplete });
+  const cfg = useRef({ videoId, resumeAt, antiSkip, onComplete });
   useEffect(() => {
-    cfg.current = { videoId, resumeAt, onComplete };
-  }, [videoId, resumeAt, onComplete]);
+    cfg.current = { videoId, resumeAt, antiSkip, onComplete };
+  }, [videoId, resumeAt, antiSkip, onComplete]);
 
   const latest = useRef({ position: 0, duration: 0 });
   const resumed = useRef(false);
@@ -71,6 +75,8 @@ export function VideoPlayer({
   const lastSavedSec = useRef(0);
   // Position we resumed to; used to avoid re-saving an unmoved spot.
   const resumedPos = useRef<number | null>(null);
+  // Furthest point watched this session — the anti-skip ceiling.
+  const maxAllowed = useRef(0);
   const unsub = useRef<(() => void) | null>(null);
   const capUnsub = useRef<(() => void) | null>(null);
 
@@ -144,6 +150,7 @@ export function VideoPlayer({
           if (at > 2 && at < duration * COMPLETE_AT) {
             resumedPos.current = at;
             lastSavedSec.current = Math.floor(at);
+            maxAllowed.current = at;
             // Seed latest so an immediate save (before the seek reflects in
             // state) reports the resume point, not the pre-seek 0.
             latest.current = { position: at, duration };
@@ -152,6 +159,16 @@ export function VideoPlayer({
             resumedPos.current = 0;
           }
           return; // don't run save/complete on the tick we resume
+        }
+
+        // Anti-skip: block seeking past the furthest-watched point. Backward
+        // seeks (rewatch) are always allowed; only forward jumps are clamped.
+        if (cfg.current.antiSkip) {
+          if (position > maxAllowed.current + SKIP_BUFFER) {
+            player.currentTime = maxAllowed.current;
+            return;
+          }
+          if (position > maxAllowed.current) maxAllowed.current = position;
         }
 
         // Completion — fire once at ≥95% watched or on `ended`.

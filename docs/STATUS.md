@@ -3,12 +3,12 @@
 Living tracker of what's **done**, **outstanding**, and **next**. Update this at the end
 of each phase/slice. Plan + specs: [`PLAN.md`](./PLAN.md) · [`specs/`](./specs).
 
-_Last updated: 2026-08-19 (LMS Wave 1 merged; **Wave 2** built on branch
-`phase-1-training-c`)._
+_Last updated: 2026-08-20 (LMS Wave 2 merged; **Wave 3** built on branch
+`phase-1-training-d`)._
 
-**Current branch:** `phase-1-training-c` (unmerged). **Working on:** Training/LMS →
-enterprise LMS roadmap (5 waves). **Do next:** run migration + verify + commit **Wave 2**
-(enrollment/assignment/notifications/My Learning), then Wave 3 (compliance/certificates).
+**Current branch:** `phase-1-training-d` (unmerged). **Working on:** Training/LMS →
+enterprise LMS roadmap (5 waves). **Do next:** run migration + verify + commit **Wave 3**
+(certificates/compliance/analytics/anti-skip), then Wave 4 (quizzes).
 
 ---
 
@@ -20,7 +20,7 @@ enterprise LMS roadmap (5 waves). **Do next:** run migration + verify + commit *
 | Phase 1a — Auth (production) | ✅ merged to `main` |
 | Phase 1 — Core KB | 🟡 partial (Categories, Documents, Videos, Browse done) |
 | Phase 2 — Video pipeline | ✅ merged to `main` (2a→2d-ii) |
-| **Training / LMS** | 🚧 in progress — Wave 1 merged; **Wave 2 built** on `phase-1-training-c` |
+| **Training / LMS** | 🚧 in progress — Wave 2 merged; **Wave 3 built** on `phase-1-training-d` |
 | Phase 2 — AI (2e) | ⬜ not started |
 | Phase 3 — Enterprise hardening | ⬜ not started |
 
@@ -104,9 +104,19 @@ analytics, quizzes, Trailhead-style badges, notes, notifications. Ships wave by 
 - [x] **Course overview page** — `/courses/[id]` with no `?lesson=` now shows syllabus +
   progress + Start/Continue CTA; the player shows when a lesson is selected.
 
-**Wave 3 — Compliance, Certificates, Analytics, Anti-skip** · migration: **certificates** +
-verify page, **required-training + compliance dashboard**, **admin analytics + CSV export**,
-**anti-skip** enforcement.
+**Wave 3 — Compliance, Certificates, Analytics, Anti-skip — BUILT (migrate + verify + commit on `phase-1-training-d`):**
+- [x] **Migration** — `courses` +`required`/`antiSkip`; new `certificates` table (unique
+  user+course, unique `code`). Run `bun run db:generate` then `bun run db:migrate`.
+- [x] **Certificates** — `certificates.ts` (issue on completion, idempotent); public
+  printable **`/verify/[code]`** page; links from My Learning (completed) + course overview;
+  completion notification now points at the certificate.
+- [x] **Compliance + analytics** — `analytics.ts` (`courseAnalytics`, `orgSummary`,
+  `learnerProgress`); **`/analytics`** (admin, `analytics:read`) with compliance rate,
+  required-training table, per-course stats; **`/analytics/[courseId]`** learner table;
+  **CSV export** `GET /api/analytics/courses/[id]/csv`.
+- [x] **Required + anti-skip** — course edit **Settings** toggles
+  (`CourseSettings.tsx` → `setCourseFlagsAction`); player clamps forward seeks past the
+  furthest-watched point when `antiSkip`; Required/No-skipping badges on the overview.
 
 **Wave 4 — Quizzes & pass-gating** · migration: quiz authoring/taking + gating.
 
