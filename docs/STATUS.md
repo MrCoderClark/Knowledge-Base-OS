@@ -3,12 +3,13 @@
 Living tracker of what's **done**, **outstanding**, and **next**. Update this at the end
 of each phase/slice. Plan + specs: [`PLAN.md`](./PLAN.md) · [`specs/`](./specs).
 
-_Last updated: 2026-08-20 (LMS Wave 3 merged; **Wave 4 + AI helpers** built on branch
-`phase-1-training-e`)._
+_Last updated: 2026-08-20 (LMS Wave 4 merged; **Wave 5** built on branch
+`phase-1-training-f` — final roadmap wave)._
 
-**Current branch:** `phase-1-training-e` (unmerged). **Working on:** Training/LMS →
-enterprise LMS roadmap. **Do next:** run migration + configure a free AI key + verify +
-commit **Wave 4** (quizzes + AI helpers), then Wave 5 (badges/notes/email).
+**Current branch:** `phase-1-training-f` (unmerged). **Working on:** Training/LMS →
+enterprise LMS roadmap (Wave 5 = last). **Do next:** run migration + verify + commit
+**Wave 5** (badges/notes/reminders). After this the 5-wave enterprise LMS roadmap is
+**complete** — remaining tracks are Phase 2e (RAG chatbot) and Phase 3 hardening.
 
 ---
 
@@ -20,7 +21,7 @@ commit **Wave 4** (quizzes + AI helpers), then Wave 5 (badges/notes/email).
 | Phase 1a — Auth (production) | ✅ merged to `main` |
 | Phase 1 — Core KB | 🟡 partial (Categories, Documents, Videos, Browse done) |
 | Phase 2 — Video pipeline | ✅ merged to `main` (2a→2d-ii) |
-| **Training / LMS** | 🚧 in progress — Wave 3 merged; **Wave 4 + AI built** on `phase-1-training-e` |
+| **Training / LMS** | 🚧 in progress — Wave 4 merged; **Wave 5 built** on `phase-1-training-f` (roadmap done) |
 | Phase 2 — AI (2e) | ⬜ not started |
 | Phase 3 — Enterprise hardening | ⬜ not started |
 
@@ -135,8 +136,16 @@ analytics, quizzes, Trailhead-style badges, notes, notifications. Ships wave by 
 - Note: quizzes are **course-level** (end-of-course). Per-lesson quiz gating is scaffolded
   in the schema (`quizzes.lessonId`) but not yet surfaced in the editor.
 
-**Wave 5 — Gamification, Notes, Email** · migration: **Trailhead-style badges + points**,
-**timestamped notes**, **email reminders** (existing sender).
+**Wave 5 — Gamification, Notes, Email reminders — BUILT (migrate + verify + commit on `phase-1-training-f`):**
+- [x] **Migration** — `user_badges`, `lesson_notes`; `badge_earned` added to `notification_type`.
+- [x] **Badges + points** — code-defined catalog (`badges.ts`, Trailhead-style: course
+  milestones 1/3/5/10 + perfect-quiz); awarded from `finalizeCourseIfComplete` + quiz submit;
+  points→rank; **Achievements** strip (rank/points/badges) on My Learning. `badge_earned` notifications.
+- [x] **Timestamped notes** — `notes.ts` + `note-actions.ts`; `videos/NotesPanel.tsx` on the
+  video page (add at current time, list, **click-to-seek** via player-context, delete).
+- [x] **Email reminders** — `sendCourseDueReminderEmail`; `reminders.ts` (`sendDueReminders`,
+  due-soon ≤3d / overdue, deduped ≤1×/20h) behind token-protected **`GET/POST /api/cron/reminders`**
+  (`CRON_SECRET`). Point any external cron at it.
 
 **AI-assisted (was slice C; now folds into a later wave / Phase 2e):** course-outline
 generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API_KEY` in `apps/ai`.
