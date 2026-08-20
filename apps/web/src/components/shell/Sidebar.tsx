@@ -30,9 +30,11 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function Sidebar({
   allowed,
   canCreateDoc,
+  orgName,
 }: {
   allowed: string[];
   canCreateDoc: boolean;
+  orgName: string | null;
 }) {
   const pathname = usePathname();
   const isActive = (href: string) =>
@@ -46,9 +48,11 @@ export function Sidebar({
         <div className="flex size-9 items-center justify-center rounded-lg bg-slate text-sm font-bold text-white">
           K
         </div>
-        <div className="leading-tight">
-          <div className="text-[15px] font-bold text-heading">KnowledgeOS</div>
-          <div className="text-xs text-muted">Enterprise Hub</div>
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-[15px] font-bold text-heading">
+            {orgName ?? "KnowledgeOS"}
+          </div>
+          <div className="text-xs text-muted">KnowledgeOS</div>
         </div>
       </div>
 
