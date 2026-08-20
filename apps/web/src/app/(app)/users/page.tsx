@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getActor, isAdmin } from "@/server/authz";
+import { can, getActor } from "@/server/authz";
 import { db } from "@/server/db";
 import { memberships, users } from "@/server/db/schema";
 import { InviteForm } from "./InviteForm";
@@ -29,7 +29,7 @@ function statusBadge(
 export default async function UsersPage() {
   const actor = await getActor();
   if (!actor) redirect("/signin");
-  if (!isAdmin(actor.role)) redirect("/");
+  if (!can(actor, "member:manage")) redirect("/");
 
   const rows = await db
     .select({

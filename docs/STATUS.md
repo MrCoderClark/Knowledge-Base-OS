@@ -159,8 +159,12 @@ generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API
 - [x] **Dashboard real data** — org-scoped KPIs, Recently Added, Recent Activity (derived from
   recent content), Continue Learning, working quick actions (`server/kb/dashboard.ts`,
   `app/(app)/page.tsx`). Built on `phase-1-dashboard`.
-- [ ] **Users module (full)** — role changes, suspend/remove, **lock status + unlock** (clears DB **and** Redis — spec'd in [`05`](./specs/05-features.md)/[`07`](./specs/07-auth-security.md)).
-- [ ] **Teams**, **Activity** feed (needs `activity_events` logging), **Analytics**, **Settings**, **Permissions** UI.
+- [ ] **Users module (full)** — ~~role changes~~ (done via Permissions UI), suspend/remove, **lock status + unlock** (clears DB **and** Redis — spec'd in [`05`](./specs/05-features.md)/[`07`](./specs/07-auth-security.md)).
+- [x] **RBAC nav + Permissions UI** (`phase-1-nav-rbac`) — effective permissions = role ∪ per-member
+  grants (`memberships.extraPermissions`, `authz.can()`); sidebar hides items you can't access;
+  **`/permissions`** page to set role + toggle individual grants (last-admin guard). Admin pages
+  (users, analytics) now gate via `can()`. **Analytics** page shipped in Wave 3.
+- [ ] **Teams**, **Activity** feed (needs `activity_events` logging), **Settings** (pages still missing; nav hidden until built).
 - [ ] **Search** — command-K over docs/videos (Postgres FTS; see [`04`](./specs/04-search.md)).
 
 ### Video — product features

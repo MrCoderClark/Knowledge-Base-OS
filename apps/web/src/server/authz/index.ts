@@ -15,9 +15,11 @@ export type Actor = {
   name: string | null;
   orgId: string;
   role: OrgRole;
+  /** Per-member permission grants layered on top of the role. */
+  grants: Permission[];
 };
 
-/** Current signed-in user resolved with their org membership + role. */
+/** Current signed-in user resolved with their org membership + role + grants. */
 export async function getActor(): Promise<Actor | null> {
   const session = await getCurrentSession();
   if (!session) return null;
@@ -32,11 +34,24 @@ export async function getActor(): Promise<Actor | null> {
     name: session.user.name,
     orgId: m.orgId,
     role: m.role,
+    grants: (m.extraPermissions ?? []) as Permission[],
   };
 }
 
 export function isAdmin(role: OrgRole): boolean {
   return role === "owner" || role === "admin";
+}
+
+/**
+ * Effective permission check — true if the actor holds `permission` by role
+ * OR by an individual grant. Use this for access decisions; prefer it over the
+ * role-only `hasPermission` wherever grants should count.
+ */
+export function can(
+  actor: Pick<Actor, "role" | "grants">,
+  permission: Permission,
+): boolean {
+  return hasPermission(actor.role, permission) || actor.grants.includes(permission);
 }
 
 /** Throws if the current user is not an org admin/owner. */
@@ -48,10 +63,10 @@ export async function requireAdmin(): Promise<Actor> {
   return actor;
 }
 
-/** Throws unless the current user holds `permission`. Returns the actor. */
+/** Throws unless the current user has `permission` (by role or grant). */
 export async function requirePermission(permission: Permission): Promise<Actor> {
   const actor = await getActor();
-  if (!actor || !hasPermission(actor.role, permission)) {
+  if (!actor || !can(actor, permission)) {
     throw new Error("Forbidden");
   }
   return actor;

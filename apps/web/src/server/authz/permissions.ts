@@ -72,3 +72,57 @@ const ROLE_PERMISSIONS: Record<OrgRole, ReadonlySet<Permission>> = {
 export function hasPermission(role: OrgRole, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].has(permission);
 }
+
+/** Permissions a role holds by default (for the grants UI — shown as inherited). */
+export function rolePermissions(role: OrgRole): ReadonlySet<Permission> {
+  return ROLE_PERMISSIONS[role];
+}
+
+export function isPermission(value: string): value is Permission {
+  return (ALL as string[]).includes(value);
+}
+
+/** Grouped, human-labeled catalog for the permission-management UI. */
+export const PERMISSION_GROUPS: {
+  group: string;
+  permissions: { key: Permission; label: string }[];
+}[] = [
+  {
+    group: "Documents",
+    permissions: [
+      { key: "document:create", label: "Create documents" },
+      { key: "document:update", label: "Edit documents" },
+      { key: "document:delete", label: "Delete documents" },
+      { key: "document:publish", label: "Publish documents" },
+    ],
+  },
+  {
+    group: "Videos",
+    permissions: [
+      { key: "video:create", label: "Upload videos" },
+      { key: "video:update", label: "Edit videos" },
+      { key: "video:delete", label: "Delete videos" },
+      { key: "video:publish", label: "Publish videos" },
+    ],
+  },
+  {
+    group: "Training & content",
+    permissions: [
+      { key: "course:manage", label: "Manage courses (Training)" },
+      { key: "category:manage", label: "Manage categories" },
+      { key: "collection:manage", label: "Manage collections" },
+    ],
+  },
+  {
+    group: "Administration",
+    permissions: [
+      { key: "member:invite", label: "Invite members" },
+      { key: "member:manage", label: "Manage members (Users)" },
+      { key: "team:manage", label: "Manage teams" },
+      { key: "analytics:read", label: "View analytics" },
+      { key: "activity:read", label: "View activity" },
+      { key: "settings:manage", label: "Manage settings" },
+      { key: "permissions:manage", label: "Manage permissions" },
+    ],
+  },
+];

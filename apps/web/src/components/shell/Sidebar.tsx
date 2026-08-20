@@ -27,10 +27,17 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({
+  allowed,
+  canCreateDoc,
+}: {
+  allowed: string[];
+  canCreateDoc: boolean;
+}) {
   const pathname = usePathname();
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const visible = new Set(allowed);
 
   return (
     <aside className="flex w-[280px] shrink-0 flex-col border-r border-border bg-surface">
@@ -46,25 +53,34 @@ export function Sidebar() {
       </div>
 
       {/* Primary action */}
-      <div className="px-4 pb-2">
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">
-          <Plus className="size-4" strokeWidth={2.5} />
-          New Document
-        </button>
-      </div>
+      {canCreateDoc && (
+        <div className="px-4 pb-2">
+          <Link
+            href="/documents/new"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <Plus className="size-4" strokeWidth={2.5} />
+            New Document
+          </Link>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
-        {primaryNav.map((item) => (
-          <NavLink key={item.href} item={item} active={isActive(item.href)} />
-        ))}
+        {primaryNav
+          .filter((item) => visible.has(item.href))
+          .map((item) => (
+            <NavLink key={item.href} item={item} active={isActive(item.href)} />
+          ))}
       </nav>
 
       {/* Footer nav */}
       <div className="space-y-1 border-t border-border px-4 py-4">
-        {footerNav.map((item) => (
-          <NavLink key={item.href} item={item} active={isActive(item.href)} />
-        ))}
+        {footerNav
+          .filter((item) => visible.has(item.href))
+          .map((item) => (
+            <NavLink key={item.href} item={item} active={isActive(item.href)} />
+          ))}
       </div>
     </aside>
   );
