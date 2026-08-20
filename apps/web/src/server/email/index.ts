@@ -80,6 +80,39 @@ export async function sendCourseAssignedEmail(params: {
   });
 }
 
+export async function sendCourseDueReminderEmail(params: {
+  to: string;
+  name?: string | null;
+  courseTitle: string;
+  url: string;
+  dueAt: Date;
+  overdue: boolean;
+}): Promise<void> {
+  const greeting = params.name ? `Hi ${params.name},` : "Hi,";
+  const when = params.dueAt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const line = params.overdue
+    ? `is <strong>overdue</strong> (was due ${when})`
+    : `is due by <strong>${when}</strong>`;
+  await sendMail({
+    to: params.to,
+    subject: params.overdue
+      ? `Overdue: ${params.courseTitle}`
+      : `Reminder: ${params.courseTitle} is due soon`,
+    text: `${greeting}\n\nYour training "${params.courseTitle}" ${
+      params.overdue ? `is overdue (was due ${when})` : `is due by ${when}`
+    }.\n\nContinue here:\n${params.url}`,
+    html: layout(
+      params.overdue ? "Training overdue" : "Training due soon",
+      `<p style="margin:0 0 16px;font-size:14px;">${greeting} your training <strong>${params.courseTitle}</strong> ${line}.</p>
+       <p style="margin:0 0 20px;">${button(params.url, "Continue course")}</p>`,
+    ),
+  });
+}
+
 export async function sendPasswordResetEmail(params: {
   to: string;
   name?: string | null;

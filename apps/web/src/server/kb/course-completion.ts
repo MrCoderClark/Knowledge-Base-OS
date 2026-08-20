@@ -1,7 +1,8 @@
+import { awardCourseBadges } from "./badges";
 import { issueCertificate } from "./certificates";
 import { getCourse } from "./courses";
 import { completeEnrollmentIfDone } from "./enrollments";
-import { createNotification } from "./notifications";
+import { createNotification, notifyMany } from "./notifications";
 import { getCourseQuiz, hasPassedQuiz } from "./quizzes";
 
 /**
@@ -33,6 +34,19 @@ export async function finalizeCourseIfComplete(
       body: "You've finished every lesson — your certificate is ready. 🎉",
       linkUrl: `/verify/${code}`,
     });
+
+    // Gamification — award milestone badges and notify for new ones.
+    const newBadges = await awardCourseBadges(orgId, userId);
+    await notifyMany(
+      newBadges.map((b) => ({
+        orgId,
+        userId,
+        type: "badge_earned" as const,
+        title: `Badge earned: ${b.icon} ${b.name}`,
+        body: `${b.description} +${b.points} points`,
+        linkUrl: "/my-learning",
+      })),
+    );
   }
   return justFinished;
 }

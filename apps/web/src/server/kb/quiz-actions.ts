@@ -5,8 +5,10 @@ import { z } from "zod";
 import { getAIProvider, isAIConfigured } from "@/server/ai";
 import { getActor, requirePermission } from "@/server/authz";
 import { readFileBuffer } from "@/server/storage";
+import { awardBadge } from "./badges";
 import { finalizeCourseIfComplete } from "./course-completion";
 import { getCourse } from "./courses";
+import { createNotification } from "./notifications";
 import {
   getQuizById,
   type QuizQuestionInput,
@@ -256,6 +258,20 @@ export async function submitQuizAttemptAction(
   const passed = score >= quiz.passPct;
 
   await recordAttempt({ userId: actor.userId, quizId, score, passed, answers });
+
+  if (score === 100) {
+    const badge = await awardBadge(actor.orgId, actor.userId, "perfect-quiz");
+    if (badge) {
+      await createNotification({
+        orgId: actor.orgId,
+        userId: actor.userId,
+        type: "badge_earned",
+        title: `Badge earned: ${badge.icon} ${badge.name}`,
+        body: `${badge.description} +${badge.points} points`,
+        linkUrl: "/my-learning",
+      });
+    }
+  }
   if (passed) {
     // Passing may be the last thing gating course completion.
     await finalizeCourseIfComplete(actor.orgId, actor.userId, quiz.courseId);

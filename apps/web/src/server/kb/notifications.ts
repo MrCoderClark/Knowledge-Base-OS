@@ -5,7 +5,8 @@ import { notifications } from "@/server/db/schema";
 export type NotificationType =
   | "course_assigned"
   | "course_completed"
-  | "course_due_soon";
+  | "course_due_soon"
+  | "badge_earned";
 
 export type NewNotification = {
   orgId: string;

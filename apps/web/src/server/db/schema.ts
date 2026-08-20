@@ -417,6 +417,7 @@ export const notificationType = pgEnum("notification_type", [
   "course_assigned",
   "course_completed",
   "course_due_soon",
+  "badge_earned",
 ]);
 
 export const notifications = pgTable(
@@ -527,6 +528,48 @@ export const quizAttempts = pgTable(
       .notNull(),
   },
   (t) => [index("quiz_attempts_user_idx").on(t.userId, t.quizId)],
+);
+
+/* ------------------------------------------------------------------ */
+/* Training / LMS — Gamification + Notes (Wave 5)                     */
+/* ------------------------------------------------------------------ */
+
+// Badge definitions live in code (server/kb/badges.ts); we store only awards.
+export const userBadges = pgTable(
+  "user_badges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    badgeKey: text("badge_key").notNull(),
+    earnedAt: timestamp("earned_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [unique().on(t.userId, t.badgeKey)],
+);
+
+export const lessonNotes = pgTable(
+  "lesson_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    videoId: uuid("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    timestampSeconds: integer("timestamp_seconds").notNull().default(0),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("lesson_notes_user_video_idx").on(t.userId, t.videoId)],
 );
 
 export const jobs = pgTable(

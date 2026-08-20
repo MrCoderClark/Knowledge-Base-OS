@@ -11,9 +11,11 @@ import {
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getActor, hasPermission } from "@/server/authz";
+import { listNotes } from "@/server/kb/notes";
 import { getVideoProgress } from "@/server/kb/progress";
 import { getVideoWithMeta, relatedVideos } from "@/server/kb/videos";
 import { ChapterList } from "../ChapterList";
+import { NotesPanel } from "../NotesPanel";
 import { PlayerProvider } from "../player-context";
 import { TranscriptPanel } from "../TranscriptPanel";
 import { VideoActionBar } from "../VideoActionBar";
@@ -54,6 +56,7 @@ export default async function VideoViewPage({
   const related = await relatedVideos(actor.orgId, id);
   const resume = await getVideoProgress(actor.userId, id);
   const resumeAt = resume?.lastPositionSeconds ?? undefined;
+  const notes = await listNotes(actor.userId, id);
   const duration = fmtDuration(video.durationSeconds);
   const chapters =
     (video.chapters as { start: number; title: string }[] | null) ?? [];
@@ -204,6 +207,10 @@ export default async function VideoViewPage({
                 )}
               </div>
             </div>
+          )}
+
+          {video.status === "ready" && (
+            <NotesPanel videoId={video.id} initialNotes={notes} />
           )}
           </PlayerProvider>
         </div>
