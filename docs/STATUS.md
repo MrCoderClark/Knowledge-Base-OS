@@ -156,7 +156,9 @@ generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API
 
 ### Phase 1 — Core KB (remaining)
 - [ ] ~~**Collections**~~ → **superseded by Courses** (Training/LMS above).
-- [ ] **Dashboard real data** — KPIs, Recently Added, Recent Activity, **Continue Learning** (currently mock).
+- [x] **Dashboard real data** — org-scoped KPIs, Recently Added, Recent Activity (derived from
+  recent content), Continue Learning, working quick actions (`server/kb/dashboard.ts`,
+  `app/(app)/page.tsx`). Built on `phase-1-dashboard`.
 - [ ] **Users module (full)** — role changes, suspend/remove, **lock status + unlock** (clears DB **and** Redis — spec'd in [`05`](./specs/05-features.md)/[`07`](./specs/07-auth-security.md)).
 - [ ] **Teams**, **Activity** feed (needs `activity_events` logging), **Analytics**, **Settings**, **Permissions** UI.
 - [ ] **Search** — command-K over docs/videos (Postgres FTS; see [`04`](./specs/04-search.md)).
