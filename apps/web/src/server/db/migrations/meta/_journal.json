@@ -71,6 +71,13 @@
       "when": 1787160607829,
       "tag": "0009_gigantic_kree",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787231586718,
+      "tag": "0010_wakeful_venus",
+      "breakpoints": true
     }
   ]
 }

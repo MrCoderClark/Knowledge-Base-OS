@@ -132,6 +132,22 @@ export async function setCourseStatus(params: {
     .where(and(eq(courses.id, params.id), eq(courses.orgId, params.orgId)));
 }
 
+export async function setCourseFlags(params: {
+  orgId: string;
+  id: string;
+  required: boolean;
+  antiSkip: boolean;
+}): Promise<void> {
+  await db
+    .update(courses)
+    .set({
+      required: params.required,
+      antiSkip: params.antiSkip,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(courses.id, params.id), eq(courses.orgId, params.orgId)));
+}
+
 export async function deleteCourse(params: {
   orgId: string;
   id: string;

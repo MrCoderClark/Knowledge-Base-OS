@@ -1,7 +1,8 @@
-import { Check, Clock, ListVideo, Play } from "lucide-react";
+import { Award, Check, Clock, ListVideo, Play } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getActor, hasPermission } from "@/server/authz";
+import { getCertificateCode } from "@/server/kb/certificates";
 import { completedLessonIds, getCourse, getCourseLessons } from "@/server/kb/courses";
 import { ensureEnrollment } from "@/server/kb/enrollments";
 import { getVideoProgressMap } from "@/server/kb/progress";
@@ -144,12 +145,11 @@ export default async function CourseViewPage({
     const started =
       completed.size > 0 ||
       lessons.some((l) => (progress.get(l.itemId)?.progressPct ?? 0) > 0);
-    const cta =
-      completed.size === lessons.length
-        ? "Review course"
-        : started
-          ? "Continue"
-          : "Start course";
+    const isComplete = completed.size === lessons.length;
+    const certCode = isComplete
+      ? await getCertificateCode(actor.userId, course.id)
+      : null;
+    const cta = isComplete ? "Review course" : started ? "Continue" : "Start course";
     const totalDuration = fmtDuration(
       lessons.reduce((s, l) => s + (l.videoDuration ?? 0), 0),
     );
@@ -176,14 +176,35 @@ export default async function CourseViewPage({
                     {totalDuration}
                   </span>
                 )}
+                {course.required && (
+                  <span className="rounded-md bg-indigo-soft px-2 py-0.5 text-xs font-semibold text-indigo">
+                    Required training
+                  </span>
+                )}
+                {course.antiSkip && (
+                  <span className="rounded-md bg-nav-active px-2 py-0.5 text-xs font-semibold text-body">
+                    No skipping
+                  </span>
+                )}
               </div>
-              <Link
-                href={`/courses/${course.id}?lesson=${resumeId}`}
-                className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-slate px-5 text-sm font-semibold text-white hover:opacity-90"
-              >
-                <Play className="size-4" />
-                {cta}
-              </Link>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Link
+                  href={`/courses/${course.id}?lesson=${resumeId}`}
+                  className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate px-5 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  <Play className="size-4" />
+                  {cta}
+                </Link>
+                {certCode && (
+                  <Link
+                    href={`/verify/${certCode}`}
+                    className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-5 text-sm font-medium text-body hover:border-border-strong hover:text-slate"
+                  >
+                    <Award className="size-4" />
+                    View certificate
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
           <aside>
@@ -235,6 +256,7 @@ export default async function CourseViewPage({
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <LessonPlayer
+            key={current.id}
             courseId={course.id}
             lessonId={current.id}
             nextLessonId={nextLesson?.id ?? null}
@@ -245,6 +267,7 @@ export default async function CourseViewPage({
             }
             player={player}
             completed={completed.has(current.id)}
+            antiSkip={course.antiSkip}
           />
 
           <div className="rounded-xl border border-border bg-surface p-5">

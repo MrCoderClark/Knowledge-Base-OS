@@ -7,6 +7,7 @@ import { listVideos } from "@/server/kb/videos";
 import { AssignCourse } from "../../AssignCourse";
 import { CourseBuilder } from "../../CourseBuilder";
 import { CourseForm } from "../../CourseForm";
+import { CourseSettings } from "../../CourseSettings";
 
 export default async function EditCoursePage({
   params,
@@ -66,6 +67,15 @@ export default async function EditCoursePage({
         }))}
         availableVideos={availableVideos}
       />
+
+      <section className="mt-8 rounded-xl border border-border bg-surface p-6">
+        <h2 className="mb-4 text-lg font-semibold text-heading">Settings</h2>
+        <CourseSettings
+          courseId={course.id}
+          required={course.required}
+          antiSkip={course.antiSkip}
+        />
+      </section>
 
       <section className="mt-8 rounded-xl border border-border bg-surface p-6">
         <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold text-heading">

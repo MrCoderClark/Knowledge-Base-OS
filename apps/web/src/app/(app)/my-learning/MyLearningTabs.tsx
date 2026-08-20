@@ -1,6 +1,6 @@
 "use client";
 
-import { GraduationCap } from "lucide-react";
+import { Award, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -15,6 +15,7 @@ export type LearningCard = {
   doneLessons: number;
   totalLessons: number;
   resumeLessonId: string | null;
+  certificateCode: string | null;
 };
 
 type TabKey = "in-progress" | "assigned" | "completed" | "overdue";
@@ -62,16 +63,18 @@ function CourseRow({ c }: { c: LearningCard }) {
         : "Start";
 
   return (
-    <Link
-      href={href}
-      className="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong"
-    >
+    <div className="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong">
       <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-soft to-nav-active text-indigo">
         <GraduationCap className="size-6" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-heading">{c.title}</span>
+          <Link
+            href={href}
+            className="font-semibold text-heading hover:text-indigo"
+          >
+            {c.title}
+          </Link>
           {c.assigned && (
             <span className="rounded-md bg-indigo-soft px-2 py-0.5 text-xs font-semibold text-indigo">
               Assigned
@@ -100,10 +103,24 @@ function CourseRow({ c }: { c: LearningCard }) {
           </span>
         </div>
       </div>
-      <span className="shrink-0 rounded-lg bg-slate px-4 py-2 text-sm font-medium text-white">
-        {cta}
-      </span>
-    </Link>
+      <div className="flex shrink-0 items-center gap-2">
+        {c.status === "completed" && c.certificateCode && (
+          <Link
+            href={`/verify/${c.certificateCode}`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-body hover:border-border-strong hover:text-slate"
+          >
+            <Award className="size-4" />
+            Certificate
+          </Link>
+        )}
+        <Link
+          href={href}
+          className="rounded-lg bg-slate px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        >
+          {cta}
+        </Link>
+      </div>
+    </div>
   );
 }
 

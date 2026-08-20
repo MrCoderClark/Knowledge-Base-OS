@@ -37,6 +37,7 @@ export default async function MyLearningPage() {
             doneLessons: c.doneLessons,
             totalLessons: c.totalLessons,
             resumeLessonId: c.resumeLessonId,
+            certificateCode: c.certificateCode,
           }))}
         />
       )}
