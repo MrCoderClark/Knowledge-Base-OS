@@ -42,6 +42,7 @@ export function TranscriptPanel({ captionsUrl }: { captionsUrl: string }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const activeRef = useRef<HTMLButtonElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -62,9 +63,21 @@ export function TranscriptPanel({ captionsUrl }: { captionsUrl: string }) {
     (c) => currentTime >= c.start && currentTime < c.end,
   );
 
-  // Keep the active line in view while playing.
+  // Keep the active line in view — but scroll ONLY the transcript container,
+  // never the page (scrollIntoView would scroll the window and jump the page
+  // down to the transcript each time the active line advances).
   useEffect(() => {
-    if (!query) activeRef.current?.scrollIntoView({ block: "nearest" });
+    if (query) return;
+    const el = activeRef.current;
+    const container = scrollRef.current;
+    if (!el || !container) return;
+    const elRect = el.getBoundingClientRect();
+    const cRect = container.getBoundingClientRect();
+    if (elRect.top < cRect.top) {
+      container.scrollTop -= cRect.top - elRect.top;
+    } else if (elRect.bottom > cRect.bottom) {
+      container.scrollTop += elRect.bottom - cRect.bottom;
+    }
   }, [activeIndex, query]);
 
   const filtered = useMemo(() => {
@@ -87,7 +100,7 @@ export function TranscriptPanel({ captionsUrl }: { captionsUrl: string }) {
         placeholder="Search transcript…"
         className="mb-3 h-9 w-full rounded-lg border border-border bg-canvas px-3 text-sm text-heading placeholder:text-muted focus:border-indigo focus:outline-none focus:ring-2 focus:ring-indigo/20"
       />
-      <div className="max-h-80 space-y-0.5 overflow-y-auto">
+      <div ref={scrollRef} className="max-h-80 space-y-0.5 overflow-y-auto">
         {filtered.map(({ c, i }) => {
           const isActive = !query && i === activeIndex;
           return (
