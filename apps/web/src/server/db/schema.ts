@@ -447,6 +447,28 @@ export const notifications = pgTable(
   (t) => [index("notifications_user_idx").on(t.userId, t.createdAt)],
 );
 
+export const activityEvents = pgTable(
+  "activity_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    // Who did it (null if the user was later deleted).
+    actorId: text("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    verb: text("verb").notNull(), // published, uploaded, completed, assigned, created
+    objectKind: text("object_kind").notNull(), // document, video, course, team
+    title: text("title").notNull(),
+    linkUrl: text("link_url"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index("activity_events_org_idx").on(t.orgId, t.createdAt)],
+);
+
 export const certificates = pgTable(
   "certificates",
   {

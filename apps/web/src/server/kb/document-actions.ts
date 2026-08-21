@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePermission } from "@/server/authz";
+import { logActivity } from "./activity";
 import type { DocSaveResult } from "./kb-types";
 import {
   createDocument,
   deleteDocument,
+  getDocument,
   publishDocument,
   updateDocument,
 } from "./documents";
@@ -73,6 +75,15 @@ export async function publishDocumentAction(id: string): Promise<void> {
     return;
   }
   await publishDocument({ orgId: actor.orgId, id, userId: actor.userId });
+  const doc = await getDocument(actor.orgId, id);
+  await logActivity({
+    orgId: actor.orgId,
+    actorId: actor.userId,
+    verb: "published",
+    objectKind: "document",
+    title: doc?.title ?? "a document",
+    linkUrl: `/documents/${id}`,
+  });
   revalidatePath(`/documents/${id}`);
   revalidatePath("/documents");
 }

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { type NextRequest, NextResponse } from "next/server";
 import { getActor, hasPermission } from "@/server/authz";
+import { logActivity } from "@/server/kb/activity";
 import { enqueueVideoTranscode } from "@/server/kb/jobs";
 import { createUploadedVideo } from "@/server/kb/videos";
 import { putFile } from "@/server/storage";
@@ -66,6 +67,15 @@ export async function POST(req: NextRequest) {
 
   // Kick off transcode → MP4 + poster (async; status flips to ready when done).
   await enqueueVideoTranscode(actor.orgId, id);
+
+  await logActivity({
+    orgId: actor.orgId,
+    actorId: actor.userId,
+    verb: "uploaded",
+    objectKind: "video",
+    title: title || file.name,
+    linkUrl: `/videos/${id}`,
+  });
 
   return NextResponse.json({ id });
 }

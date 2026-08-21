@@ -18,6 +18,7 @@ import {
 } from "./courses";
 import { env } from "@/server/env";
 import { sendCourseAssignedEmail } from "@/server/email";
+import { logActivity } from "./activity";
 import { finalizeCourseIfComplete } from "./course-completion";
 import { assignCourse, ensureEnrollment, teamMemberIds } from "./enrollments";
 import type { CourseFormState } from "./kb-types";
@@ -88,8 +89,18 @@ export async function setCourseStatusAction(
   courseId: string,
   status: "draft" | "published" | "archived",
 ): Promise<void> {
-  const { actor } = await requireCourse(courseId);
+  const { actor, course } = await requireCourse(courseId);
   await setCourseStatus({ orgId: actor.orgId, id: courseId, status });
+  if (status === "published") {
+    await logActivity({
+      orgId: actor.orgId,
+      actorId: actor.userId,
+      verb: "published",
+      objectKind: "course",
+      title: course.title,
+      linkUrl: `/courses/${courseId}`,
+    });
+  }
   revalidatePath(`/courses/${courseId}`);
   revalidatePath("/courses");
 }
@@ -231,6 +242,15 @@ export async function assignCourseAction(input: {
   } catch {
     // swallow — notifications already delivered in-app
   }
+
+  await logActivity({
+    orgId: actor.orgId,
+    actorId: actor.userId,
+    verb: "assigned",
+    objectKind: "course",
+    title: course.title,
+    linkUrl: `/courses/${input.courseId}`,
+  });
 
   revalidatePath("/my-learning");
   return { ok: assigned.length };

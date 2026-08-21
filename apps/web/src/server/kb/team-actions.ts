@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/server/authz";
+import { logActivity } from "./activity";
 import {
   addTeamMember,
   createTeam,
@@ -30,6 +31,14 @@ export async function createTeamAction(
   const n = name.trim();
   if (!n) return { error: "Team name is required." };
   await createTeam(actor.orgId, n, description.trim() || null);
+  await logActivity({
+    orgId: actor.orgId,
+    actorId: actor.userId,
+    verb: "created",
+    objectKind: "team",
+    title: n,
+    linkUrl: "/teams",
+  });
   revalidatePath("/teams");
   return { ok: true };
 }
