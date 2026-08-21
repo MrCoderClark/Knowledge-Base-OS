@@ -113,6 +113,23 @@ export async function sendCourseDueReminderEmail(params: {
   });
 }
 
+export async function sendAccountSuspendedEmail(params: {
+  to: string;
+  name?: string | null;
+}): Promise<void> {
+  const greeting = params.name ? `Hi ${params.name},` : "Hi,";
+  await sendMail({
+    to: params.to,
+    subject: "Your KnowledgeOS account has been suspended",
+    text: `${greeting}\n\nYour KnowledgeOS account has been suspended by an administrator and you've been signed out. If you believe this is a mistake, contact your administrator.`,
+    html: layout(
+      "Your account has been suspended",
+      `<p style="margin:0 0 12px;font-size:14px;">${greeting} your KnowledgeOS account has been suspended by an administrator and you've been signed out.</p>
+       <p style="margin:0;font-size:13px;">If you believe this is a mistake, contact your administrator.</p>`,
+    ),
+  });
+}
+
 export async function sendPasswordResetEmail(params: {
   to: string;
   name?: string | null;

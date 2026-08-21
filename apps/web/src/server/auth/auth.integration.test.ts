@@ -45,7 +45,6 @@ vi.mock("@/server/email", () => ({
 /* Imports after mocks (vitest hoists vi.mock above these). */
 import { db } from "@/server/db";
 import {
-  credentialTokens,
   memberships,
   organizations,
   sessions,
@@ -160,6 +159,25 @@ describe("login", () => {
   it("does not reveal whether an account exists (unknown email → generic)", async () => {
     const res = await loginWithPassword({ email: "ghost@test.dev", password: "whatever" });
     expect(res).toEqual({ ok: false, reason: "invalid" });
+  });
+
+  it("reveals a suspended account only after the correct password", async () => {
+    const u = await seedUser({ password: "correct-horse-1" });
+    await db
+      .update(users)
+      .set({ status: "suspended" })
+      .where(eq(users.id, u.id));
+
+    // Wrong password stays generic — no enumeration leak.
+    const wrong = await loginWithPassword({ email: "user@test.dev", password: "nope" });
+    expect(wrong).toEqual({ ok: false, reason: "invalid" });
+
+    // Correct password reveals the suspension.
+    const right = await loginWithPassword({
+      email: "user@test.dev",
+      password: "correct-horse-1",
+    });
+    expect(right).toEqual({ ok: false, reason: "suspended" });
   });
 
   it("temporarily locks the account after 5 failures (DB soft-lock)", async () => {

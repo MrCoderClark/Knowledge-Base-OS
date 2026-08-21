@@ -1,16 +1,19 @@
-import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { can, getActor } from "@/server/authz";
-import { db } from "@/server/db";
-import { memberships, users } from "@/server/db/schema";
+import { listManagedUsers } from "@/server/kb/users";
 import { InviteForm } from "./InviteForm";
+import { UserRowActions } from "./UserRowActions";
 
 type Display = { label: string; className: string };
 
 function statusBadge(
-  status: string,
+  status: "invited" | "active" | "suspended",
   lockedUntil: Date | null,
 ): Display {
+  // Suspended is a hard block and wins over a soft (temporary) lock.
+  if (status === "suspended") {
+    return { label: "Suspended", className: "bg-slate-100 text-body" };
+  }
   if (lockedUntil && lockedUntil > new Date()) {
     return { label: "Locked", className: "bg-red-50 text-danger" };
   }
@@ -19,11 +22,18 @@ function statusBadge(
       return { label: "Active", className: "bg-green-50 text-success" };
     case "invited":
       return { label: "Invited", className: "bg-indigo-soft text-indigo" };
-    case "suspended":
-      return { label: "Suspended", className: "bg-slate-100 text-body" };
     default:
       return { label: status, className: "bg-slate-100 text-body" };
   }
+}
+
+function formatLastActive(d: Date | null): string {
+  if (!d) return "—";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default async function UsersPage() {
@@ -31,18 +41,7 @@ export default async function UsersPage() {
   if (!actor) redirect("/signin");
   if (!can(actor, "member:manage")) redirect("/");
 
-  const rows = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      status: users.status,
-      lockedUntil: users.lockedUntil,
-      role: memberships.role,
-    })
-    .from(memberships)
-    .innerJoin(users, eq(memberships.userId, users.id))
-    .where(eq(memberships.orgId, actor.orgId));
+  const rows = await listManagedUsers(actor.orgId);
 
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
@@ -68,13 +67,19 @@ export default async function UsersPage() {
               <th className="px-5 py-3">Email</th>
               <th className="px-5 py-3">Role</th>
               <th className="px-5 py-3">Status</th>
+              <th className="px-5 py-3">Last active</th>
+              <th className="px-5 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => {
               const badge = statusBadge(r.status, r.lockedUntil);
+              const locked =
+                r.status !== "suspended" &&
+                !!r.lockedUntil &&
+                r.lockedUntil > new Date();
               return (
-                <tr key={r.id} className={i > 0 ? "border-t border-border" : ""}>
+                <tr key={r.userId} className={i > 0 ? "border-t border-border" : ""}>
                   <td className="px-5 py-3 font-medium text-heading">
                     {r.name ?? "—"}
                   </td>
@@ -87,17 +92,24 @@ export default async function UsersPage() {
                       {badge.label}
                     </span>
                   </td>
+                  <td className="px-5 py-3 text-body">
+                    {formatLastActive(r.lastLoginAt)}
+                  </td>
+                  <td className="px-5 py-3">
+                    <UserRowActions
+                      userId={r.userId}
+                      name={r.name ?? r.email}
+                      isSelf={r.userId === actor.userId}
+                      status={r.status}
+                      locked={locked}
+                    />
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-
-      <p className="mt-4 text-xs text-muted">
-        Phase 1a · admin invite. Role changes, suspend/remove, and lock/unlock
-        actions land with the full Users module.
-      </p>
     </div>
   );
 }
