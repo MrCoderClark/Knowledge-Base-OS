@@ -3,16 +3,23 @@
 Living tracker of what's **done**, **outstanding**, and **next**. Update this at the end
 of each phase/slice. Plan + specs: [`PLAN.md`](./PLAN.md) · [`specs/`](./specs).
 
-_Last updated: 2026-08-21. **Everything below is merged to `main`** — the repo is on a
-clean `main` with no unmerged feature branches._
+_Last updated: 2026-08-21. Most work is merged to `main`; the **Users module finish**
+(suspend/remove + lock/unlock) is built on `phase-1-users-module` (pending verify + merge)._
 
-**Current branch:** `main` (clean). **Do next (pick one):** Users suspend/remove +
-lock/unlock (DB **and** Redis); video niceties (view counts, persistent Like/Save);
-Phase 3 hardening (MFA, SSO/SAML/SCIM, audit/retention). **Reserved for LAST (user's
-call):** the **RAG chatbot** — Python `apps/ai` + pgvector semantic search over
-transcripts/docs (shares the search retrieval layer; see [`04`](./specs/04-search.md) §3).
+**Current branch:** `phase-1-users-module`. **Do next (pick one):** video niceties (view
+counts, persistent Like/Save); Phase 3 hardening (MFA, SSO/SAML/SCIM, audit/retention).
+**Reserved for LAST (user's call):** the **RAG chatbot** — Python `apps/ai` + pgvector
+semantic search over transcripts/docs (shares the search retrieval layer; see
+[`04`](./specs/04-search.md) §3).
 
-### Session pickup — what's DONE (all merged to `main`)
+### Session pickup — what's DONE
+- **Users module finish** (`phase-1-users-module`, pending merge): admin **suspend/remove**
+  + **lock/unlock** on `/users`. Suspend flips `user.status` **and** membership to
+  `suspended`, revokes sessions, and emails the user; unlock clears the DB lock **and** the
+  Redis login limiter (`clearLoginLimitsForAccount`). Suspended sign-in is enumeration-safe
+  (revealed only after a correct password). `server/kb/users.ts` + `user-actions.ts`.
+  Also chore-fixed: `tsc --noEmit` errors (`env.ts`, `password.ts`), a stray nested
+  `.next` that polluted lint (+ hardened ESLint ignore), and completed the vitest dummy env.
 - **Enterprise LMS roadmap — all 5 waves complete:** (1) watch-to-complete + resume;
   (2) enrollment/assignment/notifications/My Learning; (3) certificates/compliance/analytics/
   anti-skip; (4) quizzes + pass-gating **+ AI helpers**; (5) badges/points/notes/reminders.
@@ -182,7 +189,11 @@ generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API
 - [x] **Dashboard real data** — org-scoped KPIs, Recently Added, Recent Activity (derived from
   recent content), Continue Learning, working quick actions (`server/kb/dashboard.ts`,
   `app/(app)/page.tsx`). Built on `phase-1-dashboard`.
-- [ ] **Users module (full)** — ~~role changes~~ (done via Permissions UI), suspend/remove, **lock status + unlock** (clears DB **and** Redis — spec'd in [`05`](./specs/05-features.md)/[`07`](./specs/07-auth-security.md)).
+- [x] **Users module (full)** (`phase-1-users-module`) — ~~role changes~~ (Permissions UI),
+  **suspend/remove** + **lock status + unlock** (clears DB **and** Redis). Suspend sets
+  `user.status`+membership, revokes sessions, emails the user; unlock uses
+  `clearLoginLimitsForAccount`. Enumeration-safe suspended login. Last-admin + no-self
+  guards. Spec'd in [`05`](./specs/05-features.md)/[`07`](./specs/07-auth-security.md).
 - [x] **RBAC nav + Permissions UI** (`phase-1-nav-rbac`) — effective permissions = role ∪ per-member
   grants (`memberships.extraPermissions`, `authz.can()`); sidebar hides items you can't access;
   **`/permissions`** page to set role + toggle individual grants (last-admin guard). Admin pages
@@ -217,14 +228,14 @@ generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API
 
 ## ⚠️ Pre-production must-dos (flagged during build)
 - [ ] Rotate dev-exposed secrets: **Neon password**, **Gmail app password**, seeded admin password.
-- [ ] Suspend action must set `user.status='suspended'` so the session guard picks it up (auth review R3).
+- [x] Suspend action sets `user.status='suspended'` (+ membership) and revokes sessions so the session/login guards pick it up (auth review R3) — done in `phase-1-users-module`.
 - [ ] Serve over HTTPS; secrets in a manager; trusted `X-Forwarded-For`; MinIO behind CDN.
 
 ---
 
-## ▶️ Next up (as of 2026-08-21 — LMS + admin surface complete; on clean `main`)
+## ▶️ Next up (as of 2026-08-21 — Users module built on `phase-1-users-module`, pending merge)
 Pick any; each on its own branch (user creates it, confirm before editing):
-1. **Users module finish** — suspend/remove + lock/unlock (must clear **DB and Redis**).
+1. ~~**Users module finish**~~ — ✅ done on `phase-1-users-module` (suspend/remove + lock/unlock, DB **and** Redis).
 2. **Video niceties** — view counts (Most Viewed), persistent Like/Save (currently local-only).
 3. **Phase 3 hardening** — MFA (TOTP/passkeys), SSO/SAML/SCIM, audit/retention/export.
 4. **Unify dashboard "Recent Activity"** to read the new `activity_events` table (optional polish).

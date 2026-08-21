@@ -22,7 +22,7 @@ export type LoginInput = {
 
 export type LoginResult =
   | { ok: true }
-  | { ok: false; reason: "invalid" | "locked" };
+  | { ok: false; reason: "invalid" | "locked" | "suspended" };
 
 /** Normalize an email for lookup/storage (lowercase + trim). */
 export function normalizeEmail(email: string): string {
@@ -56,7 +56,7 @@ export async function loginWithPassword(input: LoginInput): Promise<LoginResult>
     return { ok: false, reason: "invalid" };
   }
 
-  // Temporary lock / non-active status.
+  // Temporary (time-based) lock — short-circuit before touching the password.
   if (user.lockedUntil && user.lockedUntil > now) {
     await logSecurityEvent({
       type: "LOGIN_FAILURE",
@@ -66,9 +66,6 @@ export async function loginWithPassword(input: LoginInput): Promise<LoginResult>
       metadata: { reason: "locked" },
     });
     return { ok: false, reason: "locked" };
-  }
-  if (user.status !== "active") {
-    return { ok: false, reason: "invalid" };
   }
 
   if (!passwordOk) {
@@ -90,6 +87,19 @@ export async function loginWithPassword(input: LoginInput): Promise<LoginResult>
       metadata: { reason: "bad_password" },
     });
     return { ok: false, reason: locked ? "locked" : "invalid" };
+  }
+
+  // Password is correct. Only now do we reveal a non-active (suspended) account
+  // — revealing it earlier would let anyone enumerate which emails are real.
+  if (user.status !== "active") {
+    await logSecurityEvent({
+      type: "LOGIN_FAILURE",
+      userId: user.id,
+      ip: input.ip,
+      userAgent: input.userAgent,
+      metadata: { reason: "suspended" },
+    });
+    return { ok: false, reason: "suspended" };
   }
 
   // Success — transparent rehash if the stored hash is legacy/outdated.

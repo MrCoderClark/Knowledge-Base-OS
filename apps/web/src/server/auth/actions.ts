@@ -63,12 +63,17 @@ export async function loginAction(
 
   const result = await loginWithPassword({ ...parsed.data, ip, userAgent });
   if (!result.ok) {
-    await registerLoginFailure({ ip, email });
+    // "suspended" means the password was correct — don't penalize the limiter.
+    if (result.reason !== "suspended") {
+      await registerLoginFailure({ ip, email });
+    }
     return {
       error:
-        result.reason === "locked"
-          ? "Too many attempts. Please try again later."
-          : "Invalid email or password.",
+        result.reason === "suspended"
+          ? "Your account has been suspended. Contact your administrator."
+          : result.reason === "locked"
+            ? "Too many attempts. Please try again later."
+            : "Invalid email or password.",
     };
   }
 
