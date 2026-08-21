@@ -3,13 +3,36 @@
 Living tracker of what's **done**, **outstanding**, and **next**. Update this at the end
 of each phase/slice. Plan + specs: [`PLAN.md`](./PLAN.md) · [`specs/`](./specs).
 
-_Last updated: 2026-08-20 (LMS Wave 4 merged; **Wave 5** built on branch
-`phase-1-training-f` — final roadmap wave)._
+_Last updated: 2026-08-21. **Everything below is merged to `main`** — the repo is on a
+clean `main` with no unmerged feature branches._
 
-**Current branch:** `phase-1-training-f` (unmerged). **Working on:** Training/LMS →
-enterprise LMS roadmap (Wave 5 = last). **Do next:** run migration + verify + commit
-**Wave 5** (badges/notes/reminders). After this the 5-wave enterprise LMS roadmap is
-**complete** — remaining tracks are Phase 2e (RAG chatbot) and Phase 3 hardening.
+**Current branch:** `main` (clean). **Do next (pick one):** Users suspend/remove +
+lock/unlock (DB **and** Redis); video niceties (view counts, persistent Like/Save);
+Phase 3 hardening (MFA, SSO/SAML/SCIM, audit/retention). **Reserved for LAST (user's
+call):** the **RAG chatbot** — Python `apps/ai` + pgvector semantic search over
+transcripts/docs (shares the search retrieval layer; see [`04`](./specs/04-search.md) §3).
+
+### Session pickup — what's DONE (all merged to `main`)
+- **Enterprise LMS roadmap — all 5 waves complete:** (1) watch-to-complete + resume;
+  (2) enrollment/assignment/notifications/My Learning; (3) certificates/compliance/analytics/
+  anti-skip; (4) quizzes + pass-gating **+ AI helpers**; (5) badges/points/notes/reminders.
+- **AI helpers** use an `AIProvider` abstraction (`server/ai/`, OpenRouter + Gemini, env-selected
+  via `AI_PROVIDER`; free models now, Claude a drop-in later). Course-outline + quiz generation.
+- **Dashboard** real org-scoped data (`server/kb/dashboard.ts`).
+- **RBAC:** effective permissions = role ∪ per-member grants (`memberships.extraPermissions`,
+  `authz.can()`); sidebar hides inaccessible items; **/permissions** admin UI.
+- **Search (Phase 1):** `SearchProvider` + `PgFtsProvider` (Postgres FTS) + ⌘K palette + `/search`.
+- **Admin pages complete (no dead nav links):** **/teams**, **/settings** (org name+slug in
+  sidebar brand), **/activity** (logged `activity_events` feed).
+- Bug fixes: transcript auto-scroll (container-only), video control bar (`smallLayoutWhen={false}`),
+  post-login return-URL (`?next=`).
+
+### Ops notes for a fresh session
+- **User runs ALL commands** (bun, git, db:generate/db:migrate). Present exact commands; wait.
+- **Branch per phase; do NOT edit files until the user confirms they're on the new branch.**
+- Optional env (see `apps/web/.env.example`): `AI_PROVIDER`+key (AI helpers), `CRON_SECRET`
+  (`/api/cron/reminders` due reminders). App runs fine without them.
+- Latest migration is high (0013+ range); always `db:generate`/`db:migrate` after schema edits.
 
 ---
 
@@ -19,10 +42,10 @@ enterprise LMS roadmap (Wave 5 = last). **Do next:** run migration + verify + co
 |---|---|
 | Phase 0 — Foundations | ✅ merged to `main` |
 | Phase 1a — Auth (production) | ✅ merged to `main` |
-| Phase 1 — Core KB | 🟡 partial (Categories, Documents, Videos, Browse done) |
+| Phase 1 — Core KB | ✅ mostly done (docs, videos, browse, **search**, dashboard, RBAC + permissions UI, teams, settings, activity) |
 | Phase 2 — Video pipeline | ✅ merged to `main` (2a→2d-ii) |
-| **Training / LMS** | 🚧 in progress — Wave 4 merged; **Wave 5 built** on `phase-1-training-f` (roadmap done) |
-| Phase 2 — AI (2e) | ⬜ not started |
+| **Training / LMS** | ✅ **complete** — all 5 waves merged to `main` |
+| Phase 2 — AI (2e) | 🟡 LMS AI helpers done (OpenRouter/Gemini); **RAG chatbot not started** (the finale) |
 | Phase 3 — Enterprise hardening | ⬜ not started |
 
 ---
@@ -199,11 +222,16 @@ generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API
 
 ---
 
-## ▶️ Next up
-1. **Verify + commit Training slice A** on `phase-1-training` (then keep going on that branch).
-2. **Training slice B** — enrollment, auto-complete-on-watch, **Continue Learning**, **Dashboard real data** (recreate `server/kb/progress.ts`).
-3. **Training slice C** — AI course generation (Python `apps/ai` + Claude; needs `ANTHROPIC_API_KEY`).
-4. Merge `phase-1-training` → `main` at a stable point.
+## ▶️ Next up (as of 2026-08-21 — LMS + admin surface complete; on clean `main`)
+Pick any; each on its own branch (user creates it, confirm before editing):
+1. **Users module finish** — suspend/remove + lock/unlock (must clear **DB and Redis**).
+2. **Video niceties** — view counts (Most Viewed), persistent Like/Save (currently local-only).
+3. **Phase 3 hardening** — MFA (TOTP/passkeys), SSO/SAML/SCIM, audit/retention/export.
+4. **Unify dashboard "Recent Activity"** to read the new `activity_events` table (optional polish).
+5. **RESERVED FOR LAST (user's explicit call):** **RAG chatbot** — Python `apps/ai` +
+   pgvector; embed transcripts/docs → retrieval → chat. Shares the `SearchProvider` layer.
+
+_(Historical slice/wave notes below are kept for context but are all merged.)_
 
 ## How to run everything (dev)
 - **Web:** `apps/web` → `bun run dev` (port 3001). Env in `apps/web/.env.local`.
