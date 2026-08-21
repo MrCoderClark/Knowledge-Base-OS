@@ -1,3 +1,4 @@
+import { logActivity } from "./activity";
 import { awardCourseBadges } from "./badges";
 import { issueCertificate } from "./certificates";
 import { getCourse } from "./courses";
@@ -33,6 +34,14 @@ export async function finalizeCourseIfComplete(
       title: `Course complete: ${course?.title ?? "Course"}`,
       body: "You've finished every lesson — your certificate is ready. 🎉",
       linkUrl: `/verify/${code}`,
+    });
+    await logActivity({
+      orgId,
+      actorId: userId,
+      verb: "completed",
+      objectKind: "course",
+      title: course?.title ?? "a course",
+      linkUrl: `/courses/${courseId}`,
     });
 
     // Gamification — award milestone badges and notify for new ones.

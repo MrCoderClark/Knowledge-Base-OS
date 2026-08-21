@@ -168,8 +168,9 @@ generation, video-to-lesson suggestions, content-gap ideas. Needs `ANTHROPIC_API
   (`teams.ts`/`team-actions.ts`, `team:manage`); feeds course assign-to-team.
 - [x] **Settings** (`phase-1-teams-settings`) — `/settings` org profile (edit name;
   `org.ts`/`settings-actions.ts`, `settings:manage`). Thin for now — more org fields later.
-- [ ] **Activity** feed — still missing (needs an `activity_events` table + logging; nav
-  link hidden until built).
+- [x] **Activity** feed (`phase-1-activity`) — `activity_events` table + `logActivity()`
+  wired into publish (doc/course), video upload, course complete/assign, team create;
+  `/activity` page (`activity:read`, shared feed). Migration required.
 - [x] **Search** (Phase 1, `phase-1-search`) — `SearchProvider` interface + `PgFtsProvider`
   (Postgres FTS: `websearch_to_tsquery`/`ts_rank_cd`/`ts_headline` + title `ILIKE` union,
   org-scoped, published/ready only). **⌘K command palette** (`SearchPalette`) + `/search` page
