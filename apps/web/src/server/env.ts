@@ -16,7 +16,7 @@ const schema = z.object({
   SMTP_SECURE: z
     .string()
     .transform((v) => v === "true")
-    .default("false"),
+    .default(false),
   SMTP_USER: z.string().min(1),
   SMTP_PASSWORD: z.string().min(1),
   EMAIL_FROM: z.string().min(1),

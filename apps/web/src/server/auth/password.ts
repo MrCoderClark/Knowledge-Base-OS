@@ -1,4 +1,4 @@
-import { Algorithm, hash, verify } from "@node-rs/argon2";
+import { hash, verify } from "@node-rs/argon2";
 
 /**
  * Password hashing abstraction. Argon2id is the current algorithm; the shape
@@ -8,8 +8,10 @@ import { Algorithm, hash, verify } from "@node-rs/argon2";
  */
 
 // OWASP-aligned Argon2id parameters (tunable in one place).
+// @node-rs/argon2 exports Algorithm as an ambient const enum, which
+// `isolatedModules` forbids referencing; use its literal value (Argon2id = 2).
 const ARGON2_OPTS = {
-  algorithm: Algorithm.Argon2id,
+  algorithm: 2, // Algorithm.Argon2id
   memoryCost: 19456, // KiB (~19 MiB)
   timeCost: 2,
   parallelism: 1,

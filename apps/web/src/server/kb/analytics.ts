@@ -4,7 +4,6 @@ import {
   courseLessons,
   courses,
   enrollments,
-  lessonCompletions,
   users,
 } from "@/server/db/schema";
 
